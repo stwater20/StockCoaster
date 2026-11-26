@@ -330,3 +330,18 @@ body.summary-open #hud .controls, body.summary-open .minimap, body.summary-open 
   .btnrow { flex-wrap: wrap; }
   .btnrow button { flex: 1 1 30%; padding: 10px 8px; font-size: 14px; }
 }
+
+/* AI 走勢推演面板 */
+.o-top { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.o-top b { font-size: 18px; font-variant-numeric: tabular-nums; }
+.o-stance { font-size: 12px; font-weight: 700; padding: 2px 10px; border-radius: 99px; background: var(--tint); border: 1px solid var(--glass-border); }
+.o-stance.up { background: color-mix(in srgb, var(--up) 18%, transparent); color: var(--up); }
+.o-stance.down { background: color-mix(in srgb, var(--down) 18%, transparent); color: var(--down); }
+.o-row { display: flex; gap: 6px; align-items: baseline; margin: 3px 0; font-variant-numeric: tabular-nums; }
+.o-row span { color: var(--muted); font-size: 12px; }
+.o-row b { margin-right: 8px; }
+.o-chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0 6px; }
+.o-chips span { font-size: 11px; padding: 2px 8px; border-radius: 99px; background: var(--tint); border: 1px solid var(--glass-border); color: var(--muted); }
+.o-chips span b { color: var(--text); font-weight: 600; }
+.o-chips span.up b { color: var(--up); } .o-chips span.down b { color: var(--down); }
+.o-read { font-size: 13px; line-height: 1.5; }

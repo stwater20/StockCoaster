@@ -1,4 +1,4 @@
-// 「AI 預言家」：技術指標 + 蒙地卡羅模擬的玩具模型。純屬娛樂，不構成投資建議。
+// AI 走勢推演：技術指標 + 蒙地卡羅模擬的統計模型。純屬娛樂，不構成投資建議。
 
 const mean = (a) => a.reduce((s, x) => s + x, 0) / a.length;
 const sma = (a, n) => mean(a.slice(-n));
@@ -74,26 +74,29 @@ export function predict(points, horizon = 30, nPaths = 600) {
   }
   const pUp = finals.filter((x) => x > last).length / finals.length;
 
-  const signals = [];
-  if (ma20 > ma60) signals.push('MA20 站上 MA60（多頭排列）');
-  else signals.push('MA20 跌破 MA60（空頭排列）');
-  if (r14 > 70) signals.push(`RSI ${r14.toFixed(0)} 過熱，小心有人下車`);
-  else if (r14 < 30) signals.push(`RSI ${r14.toFixed(0)} 超賣，地板很硬？`);
-  else signals.push(`RSI ${r14.toFixed(0)} 溫和`);
-  signals.push(`近月動能 ${(mom * 100).toFixed(1)}%`);
+  // 年化波動度（日線 252、週線 52）
+  const stepDays = (points[points.length - 1].t - points[0].t) / 86400 / Math.max(1, points.length - 1);
+  const annVol = sigma * Math.sqrt(stepDays > 3 ? 52 : 252);
+  const p10 = bands.p10[horizon], p90 = bands.p90[horizon];
+  const width = (p90 - p10) / last;
 
-  const mood = pUp > 0.55 ? '🔮 水晶球泛紅光' : pUp < 0.45 ? '🔮 水晶球冒綠煙' : '🔮 水晶球一片霧茫茫';
-  const fortunes = pUp > 0.55
-    ? ['前方坡道向上，記得拍照。', '天機：漲。但天機常常洩漏錯的。', '我看到紅色……也可能是我眼睛充血。']
-    : pUp < 0.45
-      ? ['前方有下坡，雙手舉高比較好玩。', '天機：跌。抱緊你旁邊的乘客。', '綠色的光芒……是不是草地？']
-      : ['五五波。這不是預測，這是擲硬幣。', '多空交戰中，預言家去泡茶了。', '前方路況：雲霧繚繞，請慢行。'];
+  // 訊號：短、白話、不賣弄
+  const signals = [
+    { k: '均線', v: ma20 > ma60 ? '多頭排列' : '空頭排列', tone: ma20 > ma60 ? 1 : -1 },
+    { k: 'RSI', v: `${r14.toFixed(0)}・${r14 > 70 ? '過熱' : r14 < 30 ? '超賣' : '中性'}`, tone: r14 > 70 ? -1 : r14 < 30 ? 1 : 0 },
+    { k: '近月動能', v: `${mom >= 0 ? '+' : ''}${(mom * 100).toFixed(1)}%`, tone: Math.sign(mom) },
+    { k: '年化波動', v: `${(annVol * 100).toFixed(0)}%`, tone: 0 },
+  ];
+  const stance = pUp >= 0.55 ? '偏多' : pUp <= 0.45 ? '偏空' : '中性';
+  let read;
+  if (width > 0.35) read = `波動很大，80% 區間寬達 ${(width * 100).toFixed(0)}%，看區間比看方向實際。`;
+  else if (stance === '偏多') read = ma20 > ma60 ? '均線與動能同向偏多，模擬多數收在今天之上。' : '模擬略偏多，但均線還沒翻多，訊號不太一致。';
+  else if (stance === '偏空') read = ma20 < ma60 ? '均線與動能偏弱，模擬多數收在今天之下。' : '模擬略偏空，但均線仍是多頭排列，訊號分歧。';
+  else read = '多空訊號互相抵銷，方向接近五五波。';
 
   return {
     horizon, sigma, pUp, last,
     median: med, p10: bands.p10[horizon], p90: bands.p90[horizon],
-    bands, path: best, signals, mood,
-    fortune: fortunes[Math.floor(Math.random() * fortunes.length)],
-    confidence: Math.round(Math.abs(pUp - 0.5) * 200),
+    bands, path: best, signals, stance, read, annVol,
   };
 }

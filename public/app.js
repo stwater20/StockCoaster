@@ -736,15 +736,18 @@ function renderOracle() {
   const p = track.pred, last = p.last;
   const up = Math.round(p.pUp * 100);
   const unit = track.weekly ? '週' : '個交易日';
+  const r = p.median / last - 1;
+  const st = p.stance === '偏多' ? 'up' : p.stance === '偏空' ? 'down' : '';
   $('oracleMini').innerHTML = `
-    <div class="o-head"><svg><use href="#i-spark"/></svg><span class="o-long">AI 預言家 · ${p.horizon} ${unit}後</span><span class="o-short">AI 預言</span><b class="${cls(p.median - last)}">${fmtPct(p.median / last - 1, 1)}</b></div>
+    <div class="o-head"><svg><use href="#i-spark"/></svg><span class="o-long">AI 走勢推演 · 未來 ${p.horizon} ${unit}</span><span class="o-short">AI 推演</span><b class="${cls(r)}">${fmtPct(r, 1)}</b></div>
     <div class="o-body">
-      <div class="big ${cls(p.median - last)}">${fmtP(p.median)}</div>
+      <div class="o-top"><span class="o-stance ${st}">${p.stance}</span><span>中位數 <b class="${cls(r)}">${fmtP(p.median)}</b></span></div>
       <div class="bar2"><i style="width:${up}%"></i><i style="width:${100 - up}%"></i></div>
-      <div>上漲機率 <b class="up">${up}%</b> · 下跌 <b class="down">${100 - up}%</b></div>
-      <div>80% 區間：${fmtP(p.p10)} ~ ${fmtP(p.p90)}</div>
-      <div class="fortune">${p.mood}：「${p.fortune}」</div>
-      <div class="tiny">${p.signals.join(' · ')}<br>蒙地卡羅 600 條路徑的玩具模型，純屬娛樂，不構成投資建議。</div>
+      <div class="o-row"><span>上漲機率</span><b class="up">${up}%</b><span>下跌機率</span><b class="down">${100 - up}%</b></div>
+      <div class="o-row"><span>80% 區間</span><b>${fmtP(p.p10)} ~ ${fmtP(p.p90)}</b></div>
+      <div class="o-chips">${p.signals.map((g) => `<span class="${g.tone > 0 ? 'up' : g.tone < 0 ? 'down' : ''}">${g.k} <b>${g.v}</b></span>`).join('')}</div>
+      <div class="o-read">${p.read}</div>
+      <div class="tiny">600 條蒙地卡羅模擬＋均線、RSI、動能。統計推估，不是預測保證，也不構成投資建議。</div>
     </div>`;
 }
 $('oracleMini').onclick = () => {
@@ -782,7 +785,7 @@ function onNewDay(d) {
     if (!ride.inFuture) {
       ride.inFuture = true;
       unlock('future');
-      say('🔮 已穿越「今天」！以下軌道由 AI 預言家鋪設，沒有支架，請自求多福', 4200, true);
+      say('📈 駛過「今天」：接下來是 AI 推演的可能走勢（600 條模擬取中位數），沒有支架，僅供參考', 4200, true);
       checkGuess(closes[N - 1] / closes[0] - 1);
     }
     return;
@@ -1009,8 +1012,8 @@ function showSummary({ gameOver, ret, bonus, best, isBest }) {
       <div class="stat"><span>搭乘時間</span><b>${ride.t.toFixed(0)} 秒</b></div>
     </div>
     <div>${guessLine}</div>
-    <div class="verdict"><b>AI 預言家</b>：${pred.horizon} 個${unit}後中位數 <b class="${cls(pred.median - pred.last)}">${fmtP(pred.median)}（${fmtPct(pred.median / pred.last - 1, 1)}）</b>，
-      上漲機率 ${(pred.pUp * 100).toFixed(0)}%，信心 ${pred.confidence}/100。<br>${pred.mood}：「${pred.fortune}」</div>
+    <div class="verdict"><b>AI 走勢推演・${pred.stance}</b>：${pred.horizon} 個${unit}後中位數 <b class="${cls(pred.median - pred.last)}">${fmtP(pred.median)}（${fmtPct(pred.median / pred.last - 1, 1)}）</b>，
+      上漲機率 ${(pred.pUp * 100).toFixed(0)}%，80% 區間 ${fmtP(pred.p10)} ~ ${fmtP(pred.p90)}。<br>${pred.read}</div>
     ${ride.newAch.length ? `<div class="muted" style="margin-top:10px">這趟解鎖的成就</div><div class="newach">${ride.newAch.map((a) => `<div><span class="gicon sm">${a.ico}</span>${a.name}</div>`).join('')}</div>` : ''}
     <div class="btnrow"><button class="primary" id="againBtn">再坐一次</button><button id="shareBtn"><svg><use href="#i-share"/></svg> 分享這趟</button><button id="otherBtn">換一檔</button></div>
     <a class="promo" href="https://sectools.tw/?utm_source=stockcoaster&amp;utm_medium=referral&amp;utm_campaign=summary" target="_blank" rel="noopener"><span class="gicon sm">🧰</span><span>還沒玩夠？<b>SecTools.tw</b> 有火車駕駛、飛行模擬、資安扭蛋機，免費隨點即玩</span><svg><use href="#i-arrow"/></svg></a>
@@ -1215,7 +1218,7 @@ if (new URLSearchParams(location.search).has('og')) {
   document.documentElement.classList.add('og');
   const d = document.createElement('div');
   d.className = 'og-title';
-  d.innerHTML = '<b>股市雲霄飛車</b><span>把台股走勢變成像素雲霄飛車・紅漲綠跌・AI 預言家</span>';
+  d.innerHTML = '<b>股市雲霄飛車</b><span>把台股走勢變成像素雲霄飛車・紅漲綠跌・AI 走勢推演</span>';
   document.body.appendChild(d);
 }
 

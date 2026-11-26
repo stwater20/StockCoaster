@@ -87,6 +87,20 @@ export class Sfx {
     s.connect(f).connect(g).connect(this.master); s.start(now); s.stop(now + 0.7);
   }
 
+  blip(f0, f1, dur, type = 'square', vol = 0.12) {
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(f0, now);
+    o.frequency.exponentialRampToValueAtTime(f1, now + dur);
+    g.gain.setValueAtTime(vol, now); g.gain.exponentialRampToValueAtTime(0.001, now + dur);
+    o.connect(g).connect(this.master); o.start(now); o.stop(now + dur + 0.02);
+  }
+  jump() { this.blip(300, 700, 0.15); }
+  coin() { this.blip(990, 1500, 0.09, 'square', 0.08); }
+  hop() { this.blip(500, 250, 0.25, 'triangle', 0.15); }
+
   chime() {
     if (!this.ctx) return;
     const now = this.ctx.currentTime;

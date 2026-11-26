@@ -23,6 +23,12 @@ export const ACHIEVEMENTS = [
   { id: 'future', ico: '🛸', name: '穿越未來', desc: '駛入 AI 預測軌道' },
   { id: 'allpax', ico: '👨‍👩‍👧‍👦', name: '全員到齊', desc: '每位乘客都坐過' },
   { id: 'night', ico: '🌙', name: '夜盤戰士', desc: '在凌晨 0–5 點搭乘' },
+  { id: 'coins50', ico: '🪙', name: '錢滾錢', desc: '遊戲模式一趟吃到 50 枚金幣' },
+  { id: 'combo20', ico: '🔥', name: '連擊大師', desc: '遊戲模式達成 20 連擊' },
+  { id: 'flawless', ico: '🛡️', name: '毫髮無傷', desc: '遊戲模式沒被炸到就抵達終點' },
+  { id: 'score5000', ico: '👑', name: '股神', desc: '遊戲模式單趟 5,000 分' },
+  { id: 'derail', ico: '💥', name: '出軌了', desc: '遊戲模式愛心用光' },
+  { id: 'crowd', ico: '🚃', name: '人氣爆棚', desc: '列車接到 10 節車廂' },
   { id: 'moon', ico: '🚀', name: 'To the Moon', desc: '？？？（找找彩蛋）' },
   { id: 'curious', ico: '🐣', name: '好奇寶寶', desc: '？？？（logo 好像可以點）' },
 ];

@@ -216,3 +216,45 @@ svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width:
   .stats { grid-template-columns: repeat(2, 1fr); }
   .ach-grid { grid-template-columns: 1fr; }
 }
+
+/* ===== 自訂日期、關於、導流 ===== */
+.daterow { display: flex; align-items: center; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.daterow input { flex: 1; min-width: 130px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--glass-border); background: var(--tint); color: var(--text); font: inherit; font-size: 14px; color-scheme: light dark; }
+.daterow button { background: var(--accent); color: var(--accent-text); border: 0; border-radius: 999px; padding: 8px 16px; font-weight: 600; }
+.about { margin-top: 16px; border-top: 1px solid var(--glass-border); padding-top: 10px; font-size: 13px; }
+.about summary { cursor: pointer; color: var(--muted); font-weight: 600; list-style: none; }
+.about summary::before { content: "▸ "; }
+.about[open] summary::before { content: "▾ "; }
+.about h2 { font-size: 15px; margin: 12px 0 4px; }
+.about h3 { font-size: 13px; margin: 12px 0 6px; color: var(--muted); }
+.about p { margin: 6px 0; line-height: 1.6; }
+.about a { color: var(--accent); }
+.stock-links { list-style: none; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.stock-links a { display: inline-block; padding: 4px 10px; border-radius: 999px; background: var(--tint); border: 1px solid var(--glass-border); color: var(--text); text-decoration: none; font-size: 12px; }
+.stock-links small { color: var(--muted); }
+.promo { display: flex; align-items: center; gap: 8px; margin-top: 12px; padding: 8px 12px 8px 8px; border-radius: 16px; text-decoration: none; color: var(--text); font-size: 13px;
+  background: linear-gradient(120deg, color-mix(in srgb, var(--ai) 16%, transparent), color-mix(in srgb, var(--accent) 14%, transparent)); border: 1px solid var(--glass-border); box-shadow: inset 0 1px 0 var(--glass-hi); }
+.promo span:nth-child(2) { flex: 1; }
+.promo:hover { filter: brightness(1.06); }
+.promo .gicon.sm { margin-right: 0; }
+.btnrow button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.btnrow svg { width: 16px; height: 16px; }
+
+/* 分享圖模式 */
+html.og #menu, html.og .topbar, html.og #toasts { display: none !important; }
+.og-title { position: fixed; left: 56px; top: 48px; z-index: 30; display: flex; flex-direction: column; gap: 10px; padding: 22px 30px; border-radius: 28px;
+  background: var(--glass-strong); border: 1px solid var(--glass-border); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%); box-shadow: inset 0 1px 0 var(--glass-hi), 0 12px 40px var(--glass-shadow); }
+.og-title b { font-size: 64px; letter-spacing: -.02em; }
+.og-title span { font-size: 26px; color: var(--muted); }
+
+/* 遊戲模式 */
+.scorecard { top: 64px; left: 50%; transform: translateX(-50%); display: flex; align-items: baseline; gap: 10px; padding: 8px 16px; border-radius: 999px; font-variant-numeric: tabular-nums; }
+.scorecard b { font-size: 22px; }
+.scorecard small { color: var(--accent); font-weight: 700; }
+.gamebox { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; margin: 14px 0 4px; }
+.gamebox > div { background: var(--stat); border: 1px solid var(--glass-border); border-radius: 16px; padding: 8px 12px; box-shadow: inset 0 1px 0 var(--glass-hi); }
+.gamebox span { display: block; font-size: 11px; color: var(--muted); }
+.gamebox b { font-size: 20px; font-variant-numeric: tabular-nums; }
+.gamebox em { margin-left: 6px; font-style: normal; font-size: 12px; font-weight: 700; color: #fff; background: linear-gradient(90deg, #ff5a68, #ff9f0a); padding: 2px 8px; border-radius: 99px; }
+.gamebox small { margin-left: 6px; color: var(--muted); font-size: 11px; }
+@media (max-width: 720px) { .scorecard { top: 108px; } .minimap { top: 150px; } .oracle { top: 200px; } }

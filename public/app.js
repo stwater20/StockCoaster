@@ -1,4 +1,6 @@
-import { PRESETS, KNOWN, loadStock } from './data.js';
+import { PRESETS, KNOWN, RANGES, loadStock, resolveDates, spanDays } from './data.js';
+import { drawBackground } from './bg.js';
+import { placeItems, collide, drawItems, popText, drawFloats, JUMP_V, JUMP_G } from './game.js';
 import { predict } from './ai.js';
 import { ACHIEVEMENTS, store } from './achievements.js';
 import { Sfx } from './audio.js';
@@ -12,13 +14,35 @@ const PAX = ['🐻', '🐱', '🐸', '🧓', '🦖', '🐧'];
 const LH = 216;        // 世界高度
 const GROUND = 192;    // 地面
 const TOP = 36;        // 最高價軌道高度
-const RANGE = 116;     // 最高到最低價的像素落差
+const RANGE = 96;      // 最高到最低價的像素落差
 const MPP = 0.5;       // 每像素幾公尺（物理用）
 const LEADPX = 70, TAILPX = 90, PAD = 260;
 const HORIZON = 30;
 const G = 9.8;
 
-const ui = { code: '2330', range: '1y', pax: '🐻', guess: 'skip', spd: 1, moon: false };
+const ui = { code: '2330', range: '1y', start: '', end: '', pax: '🐻', guess: 'skip', spd: 1, moon: false, mode: 'auto' };
+const APP_ROOT = new URL('./', import.meta.url);
+const CODE_RE = /^[0-9A-Z]{4,6}$/;
+let NAMES = { ...KNOWN };
+
+// 從網址讀初始設定：/2330/、?code=2330、?range=5y、?start=2020-01-01&end=2024-12-31
+(function readURL() {
+  const q = new URLSearchParams(location.search);
+  const seg = decodeURIComponent(location.pathname.slice(APP_ROOT.pathname.length).split('/')[0] || '').toUpperCase();
+  const code = (document.documentElement.dataset.code || q.get('code') || seg || '').toUpperCase();
+  if (CODE_RE.test(code)) ui.code = code;
+  const r = q.get('range');
+  if (r && (RANGES[r] || r === 'custom')) ui.range = r;
+  const re = /^\d{4}-\d{2}-\d{2}$/;
+  if (re.test(q.get('start') || '') && re.test(q.get('end') || '')) { ui.range = 'custom'; ui.start = q.get('start'); ui.end = q.get('end'); }
+})();
+const rangeKey = () => `${ui.code}|${ui.range}|${ui.range === 'custom' ? ui.start + '~' + ui.end : ''}`;
+function shareURL() {
+  const u = new URL(`${ui.code}/`, APP_ROOT);
+  if (ui.range === 'custom') { u.searchParams.set('start', ui.start); u.searchParams.set('end', ui.end); }
+  else if (ui.range !== '1y') u.searchParams.set('range', ui.range);
+  return u.href;
+}
 let mode = 'menu';
 let track = null;
 let ride = null;
@@ -96,7 +120,7 @@ function buildTrack(data) {
   const T = closes.length;
   const lo = Math.min(...closes), hi = Math.max(...closes);
   const yOf = (p) => TOP + (1 - (p - lo) / (hi - lo || 1)) * RANGE;
-  const dx = clamp(Math.round(1500 / N), 4, 12);
+  const dx = clamp(Math.round(2600 / N), 6, 16); // 每個交易日的寬度：拉長一點，坡度才不會太陡
   const X0 = PAD + LEADPX;
   const Xend = X0 + (T - 1) * dx;
   const Xtoday = X0 + (N - 1) * dx;
@@ -119,6 +143,16 @@ function buildTrack(data) {
     const u = (x - X0) / dx, i = Math.floor(u), f = u - i;
     const p0 = dayY[Math.max(0, i - 1)], p1 = dayY[i], p2 = dayY[Math.min(T - 1, i + 1)], p3 = dayY[Math.min(T - 1, i + 2)];
     ys[x] = 0.5 * (2 * p1 + (-p0 + p2) * f + (2 * p0 - 5 * p1 + 4 * p2 - p3) * f * f + (-p0 + 3 * p1 - 3 * p2 + p3) * f * f * f);
+  }
+  // 平滑兩次（移動平均），把單日尖刺磨圓，避免太陡、車子抖動
+  const r = Math.max(2, Math.round(dx * 0.7));
+  for (let pass = 0; pass < 2; pass++) {
+    const src = ys.slice();
+    for (let x = X0 + 1; x < Xend; x++) {
+      let sum = 0, n = 0;
+      for (let k = -r; k <= r; k++) { sum += src[clamp(x + k, X0, Xend)]; n++; }
+      ys[x] = sum / n;
+    }
   }
   const S = new Float64Array(worldW);
   for (let x = 1; x < worldW; x++) S[x] = S[x - 1] + Math.hypot(1, ys[x] - ys[x - 1]) * MPP;
@@ -283,8 +317,6 @@ function renderWorld(tr) {
 
 // ---------- 天空、背景 ----------
 const sky = { top: hex(THEMES[theme].sky.base[0]), bot: hex(THEMES[theme].sky.base[1]) };
-const starField = Array.from({ length: 90 }, (_, i) => ({ x: (i * 0.6180339) % 1, y: ((i * 0.3819660 * 7) % 1) * 0.75, p: i * 1.7 }));
-const clouds = Array.from({ length: 9 }, (_, i) => ({ x: i * 131 + ((i * 37) % 50), y: 6 + ((i * 29) % 46), w: 18 + ((i * 17) % 22) }));
 
 function drawSky(dt, camX, time) {
   const th = TH();
@@ -300,72 +332,13 @@ function drawSky(dt, camX, time) {
   const k = Math.min(1, dt * 1.2);
   sky.top = mix(sky.top, hex(th.sky[key][0]), k);
   sky.bot = mix(sky.bot, hex(th.sky[key][1]), k);
-  const bands = 12, bh = Math.ceil((offY + GROUND) / bands);
-  for (let b = 0; b < bands; b++) {
-    ctx.fillStyle = rgb(mix(sky.top, sky.bot, b / (bands - 1)));
-    ctx.fillRect(0, b * bh, W, bh);
-    if (b < bands - 1) {
-      ctx.fillStyle = rgb(mix(sky.top, sky.bot, (b + 1) / (bands - 1)));
-      const y = (b + 1) * bh - 1;
-      for (let x = b & 1; x < W; x += 2) ctx.fillRect(x, y, 1, 1);
-    }
+  let ticker = 'STOCKCOASTER  TW STOCKS';
+  if (track) {
+    const d = clamp(ride ? ride.day : track.N - 1, 0, track.T - 1);
+    const p = track.closes[d], r = d > 0 ? p / track.closes[d - 1] - 1 : 0;
+    ticker = `${track.data.code}  ${fmtPx(p)}  ${r >= 0 ? '+' : ''}${(r * 100).toFixed(2)}%`;
   }
-  const skyH = offY + 120;
-  if (th.stars) {
-    for (const s of starField) {
-      const x = Math.floor((((s.x * W * 1.6 - camX * 0.03) % W) + W) % W);
-      const y = Math.floor(s.y * skyH);
-      const tw = Math.sin(time * 2 + s.p) > 0.6;
-      ctx.fillStyle = tw ? '#fff' : 'rgba(255,255,255,.5)';
-      ctx.fillRect(x, y, 1, 1);
-      if (tw && s.p % 3 < 0.4) { ctx.fillRect(x - 1, y, 3, 1); ctx.fillRect(x, y - 1, 1, 3); }
-    }
-    pxDisc(W - 46, 18, 9, '#fff6d8', '#e9dcb0');
-    ctx.fillStyle = rgb(sky.top); pxDiscFill(W - 42, 15, 7);
-  } else {
-    pxDisc(W - 46, 20, 11, '#fff7b0', '#ffd23f');
-    for (const c of clouds) {
-      const span = W + 160;
-      const x = ((((c.x - camX * 0.08 - time * 3) % span) + span) % span) - 80;
-      drawCloud(Math.round(x), c.y + Math.max(0, offY - 30), c.w);
-    }
-  }
-  // 遠山兩層
-  const base = offY + GROUND;
-  ctx.fillStyle = th.mtn[1];
-  for (let sx = 0; sx < W; sx++) {
-    const wx = sx + camX * 0.12;
-    const h = 46 + 16 * Math.sin(wx * 0.011) + 9 * Math.sin(wx * 0.029 + 1) + 4 * Math.sin(wx * 0.08);
-    ctx.fillRect(sx, (base - h) | 0, 1, h | 0);
-  }
-  ctx.fillStyle = th.mtn[0];
-  for (let sx = 0; sx < W; sx++) {
-    const wx = sx + camX * 0.25;
-    const h = 30 + 12 * Math.sin(wx * 0.017 + 2) + 6 * Math.sin(wx * 0.05);
-    ctx.fillRect(sx, (base - h) | 0, 1, h | 0);
-  }
-  // 遠方城市剪影
-  const par = 0.45, bw = 10;
-  const first = Math.floor((camX * par) / bw) - 1;
-  for (let k2 = first; k2 < first + W / bw + 3; k2++) {
-    const r = Math.abs(Math.sin(k2 * 12.9898) * 43758.5453) % 1;
-    const h = Math.round(12 + r * 34);
-    const x = Math.round(k2 * bw - camX * par);
-    ctx.fillStyle = th.far;
-    ctx.fillRect(x, base - h, bw - 2, h);
-    ctx.fillStyle = th.farWin;
-    for (let wy = base - h + 3; wy < base - 3; wy += 4) if ((wy + k2) % 3) ctx.fillRect(x + 2, wy, 1, 1);
-  }
-}
-function pxDiscFill(cx, cy, r) { for (let y = -r; y <= r; y++) { const w = Math.round(Math.sqrt(r * r - y * y)); ctx.fillRect(cx - w, cy + y, w * 2 + 1, 1); } }
-function pxDisc(cx, cy, r, c1, c2) { ctx.fillStyle = c2; pxDiscFill(cx, cy, r); ctx.fillStyle = c1; pxDiscFill(cx - 1, cy - 1, r - 2); }
-function drawCloud(x, y, w) {
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(x, y + 4, w, 5);
-  ctx.fillRect(x + 3, y + 1, Math.round(w * 0.45), 4);
-  ctx.fillRect(x + Math.round(w * 0.4), y - 1, Math.round(w * 0.35), 6);
-  ctx.fillStyle = '#cfe4ff';
-  ctx.fillRect(x + 1, y + 8, w - 2, 1);
+  drawBackground(ctx, { W, offY, GROUND, camX, time, dt, theme, top: sky.top, bot: sky.bot, ticker });
 }
 
 // ---------- 粒子：煙火、金幣、雨、速度線 ----------
@@ -422,15 +395,19 @@ function speedLines(v) {
 }
 
 // ---------- 列車 ----------
+const carAng = [0, 0, 0];
 function drawTrain(camX) {
   const s = ride ? ride.s : track.sStart;
   const pax = ui.moon ? '🚀' : ui.pax;
   for (let k = 2; k >= 0; k--) {
     const x = xAtS(Math.max(0, s - k * 9.5));
     const xi = Math.round(x);
-    const ang = Math.atan2(track.ys[Math.min(xi + 3, track.worldW - 1)] - track.ys[Math.max(xi - 3, 0)], 6);
-    const q = Math.round(ang / (Math.PI / 16)) * (Math.PI / 16);
-    const px = Math.round(x - camX), py = Math.round(yAtX(x) + offY);
+    const ang = Math.atan2(track.ys[Math.min(xi + 6, track.worldW - 1)] - track.ys[Math.max(xi - 6, 0)], 12);
+    carAng[k] += (ang - carAng[k]) * 0.25; // 角度緩動，不會一格一格抖
+    const q = carAng[k];
+    const jh = ride ? Math.round(ride.jumpH) : 0;
+    if (ride && ride.inv > 0 && Math.floor(ride.inv * 10) % 2) continue; // 受傷閃爍
+    const px = Math.round(x - camX), py = Math.round(yAtX(x) + offY) - jh;
     ctx.save();
     ctx.translate(px, py);
     ctx.rotate(q);
@@ -494,7 +471,12 @@ function buildMenu() {
     chips.appendChild(b);
   });
   const dl = $('codeList');
-  Object.entries(KNOWN).forEach(([c, n]) => { const o = document.createElement('option'); o.value = c; o.label = n; dl.appendChild(o); });
+  const fill = () => {
+    dl.innerHTML = '';
+    Object.entries(NAMES).forEach(([c, n]) => { const o = document.createElement('option'); o.value = c; o.label = n; dl.appendChild(o); });
+  };
+  fill();
+  fetch(new URL('stocks.json', APP_ROOT)).then((r) => (r.ok ? r.json() : null)).then((j) => { if (j) { NAMES = { ...j, ...KNOWN }; fill(); } }).catch(() => {});
   $('codeInput').addEventListener('change', (e) => {
     const v = e.target.value.trim().toUpperCase();
     if (v) { ui.code = v.split(/\s/)[0]; syncChips(); preview(); }
@@ -508,8 +490,27 @@ function buildMenu() {
     pax.appendChild(b);
   });
   seg('paxSeg', (v) => { ui.pax = v; drawLogo(); });
-  seg('rangeSeg', (v) => { ui.range = v; preview(); });
+  seg('rangeSeg', (v) => {
+    ui.range = v;
+    $('dateRow').classList.toggle('hidden', v !== 'custom');
+    if (v !== 'custom') return preview();
+    if (!ui.start) { const d = resolveDates({ range: '1y' }); ui.start = d.start; ui.end = d.end; }
+    $('dateStart').value = ui.start; $('dateEnd').value = ui.end;
+  });
+  const today = resolveDates({ range: '1y' }).end;
+  $('dateStart').max = today; $('dateEnd').max = today;
+  $('dateApply').onclick = () => {
+    const a = $('dateStart').value, b = $('dateEnd').value;
+    if (!a || !b || a >= b) { $('menuMsg').textContent = '😵 開始日期要早於結束日期'; return; }
+    if (spanDays(a, b) < 14) { $('menuMsg').textContent = '😵 期間太短，至少選兩週'; return; }
+    ui.start = a; ui.end = b; preview();
+  };
+  // 套用網址帶進來的設定
+  [...$('rangeSeg').children].forEach((b) => b.classList.toggle('on', b.dataset.v === ui.range));
+  if (ui.range === 'custom') { $('dateRow').classList.remove('hidden'); $('dateStart').value = ui.start; $('dateEnd').value = ui.end; }
+  if (!PRESETS.some((p) => p.code === ui.code)) $('codeInput').value = ui.code;
   seg('guessSeg', (v) => (ui.guess = v));
+  seg('modeSeg', (v) => (ui.mode = v));
   $('btnGo').onclick = startRide;
 }
 function drawLogo() {
@@ -531,10 +532,12 @@ async function preview() {
   const tok = ++previewToken;
   $('menuMsg').textContent = `正在鋪 ${ui.code} 的軌道…`;
   try {
-    const d = await loadStock(ui.code, ui.range);
+    const d = await loadStock(ui.code, { range: ui.range, start: ui.start, end: ui.end });
     if (tok !== previewToken) return null;
     buildTrack(d);
-    track.range = ui.range;
+    track.key = rangeKey();
+    try { history.replaceState(null, '', shareURL()); } catch { /* file:// 之類 */ }
+    document.title = `${d.zhName || d.code}（${d.code}）股價雲霄飛車｜StockCoaster`;
     const r = d.points[d.points.length - 1].c / d.points[0].c - 1;
     $('menuMsg').innerHTML = `${d.displayName}：${d.points.length} 個${d.interval === '1wk' ? '週' : '交易日'}，期間 <span class="${cls(r)}">${fmtPct(r)}</span>${d.simulated ? '　⚠️ 連不到資料源，使用模擬軌道（請用 python3 server.py 啟動）' : ''}`;
     return track;
@@ -589,7 +592,7 @@ async function startRide() {
   $('btnGo').disabled = true;
   $('loading').classList.remove('hidden');
   $('loadingText').textContent = `正在鋪 ${ui.code} 的軌道…`;
-  const need = !track || track.data.code !== ui.code.replace(/\.TWO?$/, '') || track.range !== ui.range;
+  const need = !track || track.key !== rangeKey();
   const tr = need ? await preview() : track;
   $('loading').classList.add('hidden');
   $('btnGo').disabled = false;
@@ -601,7 +604,10 @@ function beginRide() {
     s: track.sStart, v: 6, day: -99, paused: false, pauses: 0, t: 0,
     runMax: track.closes[0], maxDD: 0, highs: 0, screams: 0, topV: 0, maxG: 1, minG: 1,
     bestDay: 0, worstDay: 0, g: 1, scream: 0, lastSay: 0, inFuture: false, newAch: [], lastBoom: 0,
-    bubble: null, shake: 0,
+    bubble: null,
+    // 遊戲模式
+    game: ui.mode === 'game', items: ui.mode === 'game' ? placeItems(track) : [],
+    score: 0, hearts: 3, combo: 0, maxCombo: 0, lastCoin: -9, coins: 0, hits: 0, jumpH: 0, jumpV: 0, jumps: 2, inv: 0,
   };
   mode = 'ride';
   $('menu').classList.add('hidden');
@@ -613,7 +619,65 @@ function beginRide() {
   renderOracle();
   if (new Date().getHours() < 5) unlock('night');
   if (store.addPax(ui.pax) >= PAX.length) unlock('allpax');
-  say(`🎢 ${track.data.displayName}，${fmtDate(track.times[0])} 出發！`, 2500, true);
+  $('scoreCard').classList.toggle('hidden', !ride.game);
+  updateScoreHUD();
+  if (ride.game) say('🎮 點畫面／空白鍵跳躍（可二段跳）：吃 🪙 金幣和 🧧 紅包，跳過 💣 利空炸彈！', 4500, true);
+  else say(`🎢 ${track.data.displayName}，${fmtDate(track.times[0])} 出發！`, 2500, true);
+}
+
+function updateScoreHUD() {
+  if (!ride || !ride.game) return;
+  $('hudHearts').textContent = '❤️'.repeat(ride.hearts) + '🖤'.repeat(Math.max(0, 3 - ride.hearts));
+  $('hudScore').textContent = ride.score.toLocaleString();
+  const mult = comboMult();
+  $('hudCombo').textContent = ride.combo >= 2 ? `${ride.combo} 連擊 ×${mult}` : '';
+}
+const comboMult = () => Math.min(5, 1 + Math.floor(ride.combo / 5));
+
+function jump() {
+  if (mode !== 'ride' || !ride || !ride.game || ride.paused || ride.jumps <= 0) return;
+  ride.jumpV = ride.jumps === 2 ? JUMP_V : JUMP_V * 0.8;
+  ride.jumps--;
+  sfx.jump?.();
+}
+
+function gameStep(dt) {
+  // 跳躍
+  if (ride.jumpH > 0 || ride.jumpV > 0) {
+    ride.jumpV -= JUMP_G * dt;
+    ride.jumpH += ride.jumpV * dt;
+    if (ride.jumpH <= 0) { ride.jumpH = 0; ride.jumpV = 0; ride.jumps = 2; }
+  }
+  ride.inv = Math.max(0, ride.inv - dt);
+  const x = xAtS(ride.s), railY = yAtX(x);
+  for (const it of collide(ride.items, x, railY, ride.jumpH)) {
+    if (it.type === 'bomb') {
+      if (ride.inv > 0) { it.taken = false; continue; }
+      ride.hearts--; ride.hits++; ride.combo = 0; ride.inv = 1.6;
+      sfx.boom(); firework(it.x, it.y - 4);
+      popText(it.x, it.y - 10, '-1', '#ff4757');
+      say(['💥 踩到利空！', '💥 被倒貨了！', '💥 黑天鵝來襲！'][ride.hits % 3], 1800, true);
+      if (ride.hearts <= 0) { updateScoreHUD(); return finishRide(true); }
+    } else {
+      if (ride.t - ride.lastCoin < 1.6) ride.combo++; else ride.combo = 1;
+      ride.lastCoin = ride.t;
+      ride.maxCombo = Math.max(ride.maxCombo, ride.combo);
+      const m = comboMult();
+      let pts = 0, col = '#ffd23f';
+      if (it.type === 'coin') { pts = 10 * m; ride.coins++; sfx.coin?.(); }
+      else if (it.type === 'hongbao') { pts = 88 * m; col = '#ff5a68'; sfx.chime(); }
+      else {
+        const r = Math.random();
+        if (r < 0.4 && ride.hearts < 3) { ride.hearts++; popText(it.x, it.y - 12, '+1UP', '#ff7aa8'); say('🍀 神秘箱：多一條命！', 2000, true); }
+        else { pts = 300; say('🍀 神秘箱：AI 給你 300 分！', 2000, true); }
+        sfx.chime(); col = '#b57bff';
+      }
+      if (pts) { ride.score += pts; popText(it.x, it.y - 6, `+${pts}`, col); }
+      if (ride.coins >= 50) unlock('coins50');
+      if (ride.combo >= 20) unlock('combo20');
+    }
+  }
+  updateScoreHUD();
 }
 
 function renderOracle() {
@@ -697,8 +761,8 @@ function onNewDay(d) {
   const ahead = Math.min(N - 1, dd + 6);
   const fwd = closes[ahead] / price - 1;
   const u = weekly ? '週' : '日';
-  if (!weekly && Math.abs(chg) >= 0.095) { say(chg > 0 ? `🧨 ${fmtDate(track.times[dd])} 漲停！${fmtPct(chg)}` : `🕳️ 跌停！${fmtPct(chg)}，有人在尖叫`, 3000, true); ride.shake = 0.5; }
-  else if (chg <= (weekly ? -0.08 : -0.04)) { say(`📉 單${u}重挫 ${fmtPct(chg)}，自由落體！`); ride.shake = 0.35; }
+  if (!weekly && Math.abs(chg) >= 0.095) { say(chg > 0 ? `🧨 ${fmtDate(track.times[dd])} 漲停！${fmtPct(chg)}` : `🕳️ 跌停！${fmtPct(chg)}，有人在尖叫`, 3000, true) }
+  else if (chg <= (weekly ? -0.08 : -0.04)) { say(`📉 單${u}重挫 ${fmtPct(chg)}，自由落體！`) }
   else if (chg >= (weekly ? 0.08 : 0.04)) say(`📈 單${u}大漲 ${fmtPct(chg)}，衝啊！`);
   else if (fwd <= -0.08) say(`⚠️ 前方 ${ahead - dd} ${weekly ? '週' : '天'}累跌 ${fmtPct(fwd, 1)}，抓緊扶手！`);
   else if (fwd >= 0.08) say(`⛰️ 前方是一段 ${fmtPct(fwd, 1)} 的爬坡，喀喀喀喀…`);
@@ -727,7 +791,7 @@ function step(dt) {
     sin = h1 / Math.hypot(1, h1);
     const grav = ui.moon && sin > 0 ? 0.35 : 1;
     ride.v += (-G * sin * grav - 0.0032 * ride.v * Math.abs(ride.v) - 0.12) * h;
-    const vmin = ui.moon ? 15 : 10;
+    const vmin = ui.moon ? 16 : 12;
     ride.lifting = false;
     if (ride.v < vmin && sin > -0.05) { ride.v = vmin; ride.lifting = sin > 0.08; }
     if (ride.s > track.sEnd) ride.v = Math.max(0, ride.v - 12 * h);
@@ -735,6 +799,7 @@ function step(dt) {
     ride.s += ride.v * h;
   }
   ride.t += dt;
+  if (ride.game) { gameStep(dt); if (mode !== 'ride') return; }
 
   // G 力：cosθ + v²κ/g
   const cos = 1 / Math.hypot(1, h1);
@@ -754,7 +819,6 @@ function step(dt) {
   if (ride.scream > 68 && performance.now() - (ride.lastScreamAt || 0) > 3500) {
     ride.lastScreamAt = performance.now();
     ride.screams++;
-    ride.shake = Math.max(ride.shake, 0.3);
     sfx.scream(ride.scream / 80);
   }
   if (ride.lifting) sfx.clack();
@@ -776,19 +840,37 @@ function step(dt) {
 }
 
 // ---------- 結算 ----------
-function finishRide() {
+function finishRide(gameOver = false) {
   mode = 'done';
   sfx.silence();
   const { closes, N, data, pred } = track;
   const ret = closes[N - 1] / closes[0] - 1;
+  if (gameOver) unlock('derail');
+  let bonus = 0, best = 0, isBest = false;
+  if (ride.game) {
+    if (!gameOver) {
+      bonus = Math.max(0, Math.round(ret * 1000)) + ride.hearts * 100;
+      ride.score += bonus;
+      if (ride.hits === 0) unlock('flawless');
+    }
+    if (ride.score >= 5000) unlock('score5000');
+    try {
+      const all = JSON.parse(localStorage.getItem('stockcoaster.best') || '{}');
+      best = all[rangeKey()] || 0;
+      if (ride.score > best) { isBest = best > 0 || ride.score > 0; all[rangeKey()] = ride.score; localStorage.setItem('stockcoaster.best', JSON.stringify(all)); }
+      best = Math.max(best, ride.score);
+    } catch { /* 隱私模式 */ }
+    updateScoreHUD();
+  }
   if (ride.guessResult === undefined) checkGuess(ret);
+  if (gameOver) return showSummary({ gameOver, ret, bonus, best, isBest });
   store.addRide();
   unlock('first');
   if (data.code === '2330') unlock('tsmc');
   if (data.code === '0050') unlock('etf50');
   if (!PRESETS.some((p) => p.code === data.code)) unlock('custom');
   if (store.addStock(data.code) >= 5) unlock('collector');
-  if (ui.range === '5y') unlock('marathon');
+  if (spanDays(data.start, data.end) >= 365 * 5 - 10) unlock('marathon');
   if (ride.maxDD <= -0.3) unlock('diamond');
   if (ret < -0.2) unlock('leek');
   if (ret > 0.5) unlock('rich');
@@ -798,12 +880,25 @@ function finishRide() {
     for (let i = 0; i < 5; i++) setTimeout(() => { firework(x - 80 + Math.random() * 160, Math.max(10, y - 40 - Math.random() * 40)); sfx.boom(); }, i * 300);
   }
 
+  showSummary({ gameOver, ret, bonus, best, isBest });
+}
+
+function showSummary({ gameOver, ret, bonus, best, isBest }) {
+  const { N, data, pred } = track;
   const unit = track.weekly ? '週' : '日';
   const g = ride.guessResult;
-  const guessLine = ui.guess === 'skip' ? '你這次沒下注。' : g ? `✅ 你猜「${ui.guess === 'up' ? '更高' : '更低'}」—— 猜對了！累積猜對 ${store.state.correct} 次` : `❌ 你猜「${ui.guess === 'up' ? '更高' : '更低'}」—— 市場不同意。`;
+  const gameBox = ride.game ? `<div class="gamebox">
+      <div><span>🎮 分數</span><b>${ride.score.toLocaleString()}</b>${isBest ? '<em>新紀錄！</em>' : `<small>最佳 ${best.toLocaleString()}</small>`}</div>
+      <div><span>🪙 金幣</span><b>${ride.coins}</b></div>
+      <div><span>🔥 最高連擊</span><b>${ride.maxCombo}</b></div>
+      <div><span>💣 被炸</span><b>${ride.hits}</b></div>
+      ${gameOver ? '' : `<div><span>💰 持股＋存活獎金</span><b>+${bonus.toLocaleString()}</b></div>`}
+    </div>` : '';
+  const guessLine = ui.guess === 'skip' ? '你這次沒有猜。' : g ? `✅ 你猜「${ui.guess === 'up' ? '更高' : '更低'}」—— 猜對了！累積猜對 ${store.state.correct} 次` : `❌ 你猜「${ui.guess === 'up' ? '更高' : '更低'}」—— 市場不同意。`;
   $('summary').innerHTML = `
-    <h2>抵達終點！${ret >= 0 ? '🎉' : '🫠'}</h2>
+    <h2>${gameOver ? '出軌了！💥 Game Over' : `抵達終點！${ret >= 0 ? '🎉' : '🫠'}`}</h2>
     <div class="muted">${data.displayName} · ${fmtDate(track.times[0])} → ${fmtDate(track.times[N - 1])}${data.simulated ? ' · 模擬資料' : ''}</div>
+    ${gameBox}
     ${sparkline()}
     <div class="stats">
       <div class="stat"><span>期間報酬</span><b class="${cls(ret)}">${fmtPct(ret, 1)}</b></div>
@@ -820,11 +915,22 @@ function finishRide() {
     <div class="verdict"><b>AI 預言家</b>：${pred.horizon} 個${unit}後中位數 <b class="${cls(pred.median - pred.last)}">${fmtP(pred.median)}（${fmtPct(pred.median / pred.last - 1, 1)}）</b>，
       上漲機率 ${(pred.pUp * 100).toFixed(0)}%，信心 ${pred.confidence}/100。<br>${pred.mood}：「${pred.fortune}」</div>
     ${ride.newAch.length ? `<div class="muted" style="margin-top:10px">這趟解鎖的成就</div><div class="newach">${ride.newAch.map((a) => `<div><span class="gicon sm">${a.ico}</span>${a.name}</div>`).join('')}</div>` : ''}
-    <div class="btnrow"><button class="primary" id="againBtn">再坐一次</button><button id="otherBtn">換一檔</button></div>
-    <div class="disclaimer">股價資料來源 Yahoo Finance（可能有延遲）。AI 預測是統計玩具，純屬娛樂，不構成任何投資建議。</div>`;
+    <div class="btnrow"><button class="primary" id="againBtn">再坐一次</button><button id="shareBtn"><svg><use href="#i-share"/></svg> 分享這趟</button><button id="otherBtn">換一檔</button></div>
+    <a class="promo" href="https://sectools.tw/?utm_source=stockcoaster&amp;utm_medium=referral&amp;utm_campaign=summary" target="_blank" rel="noopener"><span class="gicon sm">🧰</span><span>坐完了？到 <b>SecTools.tw</b> 逛逛更多免費工具和小遊戲</span><svg><use href="#i-arrow"/></svg></a>
+    <div class="disclaimer">股價資料來源 Yahoo Finance／FinMind（可能有延遲，已自動還原分割）。AI 預測是統計玩具，純屬娛樂，不構成任何投資建議。</div>`;
   setTimeout(() => $('summary').classList.remove('hidden'), 1000);
   $('againBtn').onclick = () => { $('summary').classList.add('hidden'); beginRide(); };
   $('otherBtn').onclick = goHome;
+  $('shareBtn').onclick = async () => {
+    const url = shareURL();
+    const text = ride.game
+      ? `我在 ${data.displayName} 的股價雲霄飛車拿到 ${ride.score.toLocaleString()} 分（${ride.coins} 枚金幣、最高 ${ride.maxCombo} 連擊）🎮 你能超過嗎？`
+      : `我剛坐完 ${data.displayName} 的股價雲霄飛車：期間 ${fmtPct(ret, 1)}、最大回檔 ${fmtPct(ride.maxDD, 1)}、尖叫 ${ride.screams} 次 🎢`;
+    try {
+      if (navigator.share) await navigator.share({ title: document.title, text, url });
+      else { await navigator.clipboard.writeText(`${text}\n${url}`); toast('🔗', '已複製分享連結', url); }
+    } catch { /* 使用者取消 */ }
+  };
 }
 
 function sparkline() {
@@ -855,6 +961,9 @@ function goHome() {
   $('menu').classList.remove('hidden');
 }
 $('btnHome').onclick = goHome;
+
+// 點畫面跳躍（遊戲模式）
+cv.addEventListener('pointerdown', (e) => { if (ride?.game) { e.preventDefault(); jump(); } });
 
 // HUD 控制
 document.querySelector('#hud .controls').addEventListener('click', (e) => {
@@ -887,7 +996,11 @@ let keyBuf = '';
 const KONAMI = 'ArrowUpArrowUpArrowDownArrowDownArrowLeftArrowRightArrowLeftArrowRightba';
 addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT') return;
-  if (e.code === 'Space') { e.preventDefault(); togglePause(); }
+  if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') {
+    if (mode === 'ride' && ride?.game) { e.preventDefault(); jump(); return; }
+    if (e.code === 'Space') { e.preventDefault(); togglePause(); }
+  }
+  if (e.code === 'KeyP' || e.code === 'Escape') togglePause();
   if (mode === 'ride' && '1234'.includes(e.key)) document.querySelector(`[data-spd="${[0.5, 1, 2, 4][+e.key - 1]}"]`)?.click();
   keyBuf = (keyBuf + e.key).slice(-80);
   if (keyBuf.toLowerCase().endsWith('moon') || keyBuf.endsWith(KONAMI)) {
@@ -932,19 +1045,18 @@ function tick(now) {
     camX += (target - camX) * (mode === 'menu' ? 1 : Math.min(1, dt * 6));
     if (Math.abs(target - camX) > W) camX = target;
   }
-  let sx = 0, sy = 0;
-  if (ride && ride.shake > 0) { ride.shake -= dt; sx = Math.round((Math.random() - 0.5) * 3); sy = Math.round((Math.random() - 0.5) * 3); }
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.imageSmoothingEnabled = false;
   drawSky(dt, camX, clock);
-  ctx.translate(sx, sy);
   if (track) {
     const cx = Math.round(camX);
     const w = Math.min(W, track.worldW - cx);
     ctx.drawImage(track.canvas, cx, 0, w, LH, 0, offY, w, LH);
+    if (ride && ride.items.length) drawItems(ctx, ride.items, cx, offY, W, clock);
     drawTrain(cx);
     updateParts(dt, cx);
+    drawFloats(ctx, cx, offY, dt);
   }
   if (mode !== 'menu' && ride) {
     if (mode === 'ride') speedLines(ride.v);
@@ -953,6 +1065,15 @@ function tick(now) {
     drawMinimap();
   } else drawRain(dt, 0);
   requestAnimationFrame(tick);
+}
+
+// ?og=1：產生分享圖用（隱藏介面，只留畫面與標題）
+if (new URLSearchParams(location.search).has('og')) {
+  document.documentElement.classList.add('og');
+  const d = document.createElement('div');
+  d.className = 'og-title';
+  d.innerHTML = '<b>股市雲霄飛車</b><span>把台股走勢變成像素雲霄飛車・紅漲綠跌・AI 預言家</span>';
+  document.body.appendChild(d);
 }
 
 buildMenu();

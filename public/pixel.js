@@ -37,6 +37,10 @@ export const PAX_SPRITES = {
   '🧓': { a: '#f1c27d', c: '#d8d8e0', px: ['..cccc..', '.cccccc.', 'caaaaaac', 'akkaakka', 'aaaaaaaa', 'aaccccaa', '.aaaaaa.', '..aaaa..'] },
   '🦖': { a: '#3fbf7f', c: '#bff5d8', px: ['..aaaaa.', '.aaaaaaa', '.aakaaaa', '.aaaaaaa', 'aaawawaa', 'aaaaaaa.', '.acca...', '.a.a....'] },
   '🐧': { a: '#2a3550', c: '#ffffff', px: ['..aaaa..', '.acccca.', '.ckcckc.', '.ccoocc.', 'aaccccaa', 'aaccccaa', '.acccca.', '.oo..oo.'] },
+  '🥬': { a: '#3fbf4f', c: '#f4fbe8', px: ['.a..a.a.', '.aa.aa..', '..aaaa..', '..cccc..', '..kcck..', '..cccc..', '..cppc..', '..cccc..'] },
+  '🧑': { a: '#f1c27d', c: '#3a2a20', px: ['..cccc..', '.cccccc.', '.caaaac.', '.akaaka.', '.aaaaaa.', '.aappaa.', '..aaaa..', '.bbbbbb.'] },
+  '👵': { a: '#f1c27d', c: '#e8e8f0', px: ['..cccc..', '.cccccc.', 'ccaaaacc', '.akaaka.', '.aaaaaa.', '.aappaa.', '..aaaa..', '.pppppp.'] },
+  '🐶': { a: '#e0a96d', c: '#7a4a24', px: ['cc....cc', 'caaaaaac', 'caaaaaac', '.akaaka.', '.aaaaaa.', '.aakkaa.', '..aaaa..', '..a..a..'] },
   '🚀': { a: '#e8e8f0', c: '#4aa3ff', px: ['...aa...', '..aaaa..', '..acca..', '..aaaa..', '.raaaar.', '.raaaar.', 'r.oyyo.r', '...oo...'] },
 };
 

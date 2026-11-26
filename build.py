@@ -7,9 +7,22 @@ import argparse
 import datetime
 import json
 import os
+import re
 import shutil
+import subprocess
+import time
 
 import seo
+
+# 模組 import：from './x.js' → from './x.js?v=版本'
+IMPORT_RE = re.compile(r"(from\s+)(['\"])\./([\w-]+\.js)\2")
+
+
+def version():
+    try:
+        return subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], text=True).strip()
+    except Exception:  # noqa: BLE001
+        return str(int(time.time()))
 
 
 def main():
@@ -24,8 +37,21 @@ def main():
         shutil.rmtree(out)
     shutil.copytree(seo.PUBLIC, out)
 
+    # 快取破除：Cloudflare／瀏覽器會把 CSS、JS 快取好幾個小時，每次部署都換新版本號，
+    # 否則手機會拿到新 HTML 配舊 CSS，版面就亂掉
+    ver = version()
+    for name in os.listdir(out):
+        if name.endswith(".js"):
+            fp = os.path.join(out, name)
+            with open(fp, encoding="utf-8") as f:
+                js = f.read()
+            js = IMPORT_RE.sub(lambda m: f"{m.group(1)}{m.group(2)}./{m.group(3)}?v={ver}{m.group(2)}", js)
+            with open(fp, "w", encoding="utf-8") as f:
+                f.write(js)
+
     stocks = seo.load_stocks(refresh=True)
     tpl = seo.read_template()
+    tpl = tpl.replace('href="style.css"', f'href="style.css?v={ver}"').replace('src="app.js"', f'src="app.js?v={ver}"')
     with open(os.path.join(out, "index.html"), "w", encoding="utf-8") as f:
         f.write(seo.render(tpl, site, None, stocks))
     for code in stocks:

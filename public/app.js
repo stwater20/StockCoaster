@@ -1,7 +1,7 @@
 import { PRESETS, KNOWN, RANGES, loadStock, resolveDates, spanDays } from './data.js';
 import { drawBackground } from './bg.js';
 import { placeItems, collide, drawItems, popText, drawFloats, JUMP_V, JUMP_G } from './game.js';
-import { draw101, drawTemple, drawStore, drawBoba, drawLanterns, drawGacha, drawParking } from './taiwan.js';
+import { LINKS, draw101, drawTemple, drawStore, drawBoba, drawLanterns, drawGacha, drawParking, drawNoodle, drawGas, drawBillboard } from './taiwan.js';
 import { createStreet, updateStreet, drawBackdrop, drawRoad } from './street.js';
 import { predict } from './ai.js';
 import { ACHIEVEMENTS, store } from './achievements.js';
@@ -11,6 +11,7 @@ import { drawText, textWidth, carSprite } from './pixel.js';
 const $ = (id) => document.getElementById(id);
 const sfx = new Sfx();
 const music = new Music(sfx);
+music.useTracks({ up: new URL('music/bgm-up.m4a', import.meta.url).href, down: new URL('music/bgm-down.m4a', import.meta.url).href }); // 個股頁在 /2330/ 底下，路徑要以 app.js 為準
 const PAX = ['🐻', '🐱', '🐸', '🧓', '🦖', '🐧'];
 
 // ---- 世界座標（像素）----
@@ -78,7 +79,7 @@ const cv = $('scene');
 const ctx = cv.getContext('2d');
 let W = 384, Hc = 256, offY = 40;
 function resize() {
-  const ps = Math.max(1, Math.min(innerHeight / (LH + 44), innerWidth / (innerWidth < innerHeight ? 175 : 250)));
+  const ps = Math.max(1, Math.min(innerHeight / (LH + 44), innerWidth / (innerWidth < innerHeight ? 150 : 250)));
   W = Math.ceil(innerWidth / ps);
   Hc = Math.ceil(innerHeight / ps);
   cv.width = W; cv.height = Hc;
@@ -199,6 +200,8 @@ function renderWorld(tr) {
   const iMaxV = vols.indexOf(maxV);
   const dark = theme === 'dark';
   let skip = 0, lastTop = null;
+  const worldSpots = [];
+  let billboardDone = false;
   for (let i = 0; i < N; i++) {
     const w = Math.max(3, dx - 1);
     const bx = X0 + i * dx - Math.floor(w / 2);
@@ -209,7 +212,11 @@ function renderWorld(tr) {
     // 台灣街景：成交量最大那天是 101，其餘偶爾是廟、超商
     if (i === iMaxV) { draw101(g, X0 + i * dx, GROUND, h + 22, dark); lastTop = null; continue; }
     const kind = rnd();
-    if (h < 26 && kind < 0.09 && i + 2 < N && i + 2 !== iMaxV && i + 1 !== iMaxV) { drawTemple(g, bx, GROUND, dx * 3 - 1); skip = 2; lastTop = null; continue; }
+    if (h < 26 && kind < 0.09 && i + 2 < N && i + 2 !== iMaxV && i + 1 !== iMaxV) {
+      drawTemple(g, bx, GROUND, dx * 3 - 1);
+      worldSpots.push({ x: bx - 3, y: GROUND - 23, w: dx * 3 + 6, h: 23, ...LINKS.temple });
+      skip = 2; lastTop = null; continue;
+    }
     if (h < 30 && kind < 0.2) { drawStore(g, bx, GROUND, w, Math.max(10, h)); lastTop = null; continue; }
     const [hh, ss, ll] = th.bld;
     g.fillStyle = `hsl(${(hh * 360 + (rnd() - 0.5) * 18) | 0} ${ss * 100}% ${((ll + (rnd() - 0.5) * 0.06) * 100).toFixed(1)}%)`;
@@ -219,7 +226,10 @@ function renderWorld(tr) {
     for (let wy = top + 3; wy < GROUND - 3; wy += 3)
       for (let wx = bx + 1; wx < bx + w - 1; wx += 2)
         if (rnd() < 0.38) { g.fillStyle = th.win[(rnd() * th.win.length) | 0]; g.fillRect(wx, wy, 1, 1); }
-    if (rnd() < 0.08 && h > 40) { g.fillStyle = '#ff4757'; g.fillRect(bx + (w >> 1), top - 4, 1, 4); }
+    if (!billboardDone && h > 44 && i > N * 0.15 && w * 4 >= 30) {
+      billboardDone = true;
+      worldSpots.push(drawBillboard(g, bx + (w >> 1) - 18, top));
+    } else if (rnd() < 0.08 && h > 40) { g.fillStyle = '#ff4757'; g.fillRect(bx + (w >> 1), top - 4, 1, 4); }
     else if (rnd() < 0.06 && w >= 5) drawBoba(g, bx + (w >> 1) - 2, top);
     if (lastTop && rnd() < 0.12) drawLanterns(g, lastTop[0], lastTop[1] + 2, bx + 1, top + 2);
     lastTop = [bx + w - 1, top];
@@ -282,8 +292,10 @@ function renderWorld(tr) {
   g.fillStyle = th.grass2;
   for (let x = 0; x < worldW; x += 3) g.fillRect(x, GROUND - ((x * 13) % 7 === 0 ? 1 : 0), 1, 2);
   // 彩蛋：扭蛋機、停車場（可以點）
-  tr.spots = [drawGacha(g, PAD + 34, GROUND), drawGacha(g, Xend + 64, GROUND)];
+  tr.spots = [drawGacha(g, PAD + 34, GROUND), drawGacha(g, Xend + 64, GROUND), ...worldSpots];
   for (let x = X0 + 520; x < Xtoday; x += 1100) tr.spots.push(drawParking(g, x, GROUND));
+  for (let x = X0 + 260; x < Xtoday; x += 900) tr.spots.push(drawNoodle(g, x, GROUND));
+  tr.spots.push(drawGas(g, Math.round(X0 + (Xtoday - X0) * 0.55), GROUND));
   let lastKey = '', lastLabelX = -999;
   for (let i = 0; i < T; i++) {
     const d = tpe(times[i]);
@@ -340,6 +352,7 @@ function renderWorld(tr) {
 // ---------- 天空、背景 ----------
 const sky = { top: hex(THEMES[theme].sky.base[0]), bot: hex(THEMES[theme].sky.base[1]) };
 
+const bgSpots = {};
 function drawSky(dt, camX, time) {
   const th = TH();
   let key = 'base';
@@ -361,7 +374,7 @@ function drawSky(dt, camX, time) {
     const p = track.closes[d], r = d > 0 ? p / track.closes[d - 1] - 1 : 0;
     ticker = `${track.data.code}  ${fmtPx(p)}  ${r >= 0 ? '+' : ''}${(r * 100).toFixed(2)}%`;
   }
-  drawBackground(ctx, { W, offY, GROUND, camX, time, dt, theme, top: sky.top, bot: sky.bot, ticker });
+  bgSpots.blimp = drawBackground(ctx, { W, offY, GROUND, camX, time, dt, theme, top: sky.top, bot: sky.bot, ticker });
 }
 
 // ---------- 粒子：煙火、金幣、雨、速度線 ----------
@@ -578,6 +591,7 @@ function toast(ico, title, sub) {
   t.className = 'toast glass';
   t.innerHTML = `<span class="gicon">${ico}</span><div><b>${title}</b><small>${sub}</small></div>`;
   $('toasts').appendChild(t);
+  while ($('toasts').children.length > 3) $('toasts').firstElementChild.remove();
   setTimeout(() => t.remove(), 4000);
 }
 function unlock(id) {
@@ -595,7 +609,16 @@ function renderAch() {
     return `<div class="ach ${got ? 'got' : ''}"><span class="gicon">${a.ico}</span><div><b>${got || !a.desc.startsWith('？') ? a.name : '？？？'}</b><small>${a.desc}</small></div></div>`;
   }).join('');
 }
-$('btnAch').onclick = () => $('achPanel').classList.toggle('hidden');
+$('btnAch').onclick = (e) => {
+  e.stopPropagation();
+  const open = $('achPanel').classList.toggle('hidden') === false;
+  if (open) $('oracleMini').classList.add('collapsed'); // 面板互斥，避免疊在一起
+};
+// 點面板外面就收起來
+document.addEventListener('pointerdown', (e) => {
+  if (!$('achPanel').classList.contains('hidden') && !e.target.closest('#achPanel, #btnAch')) $('achPanel').classList.add('hidden');
+  if (!$('oracleMini').classList.contains('collapsed') && !e.target.closest('#oracleMini')) $('oracleMini').classList.add('collapsed');
+});
 $('achClose').onclick = () => $('achPanel').classList.add('hidden');
 $('btnSound').onclick = () => {
   sfx.init();
@@ -714,7 +737,7 @@ function renderOracle() {
   const up = Math.round(p.pUp * 100);
   const unit = track.weekly ? '週' : '個交易日';
   $('oracleMini').innerHTML = `
-    <div class="o-head"><svg><use href="#i-spark"/></svg><span>AI 預言家 · ${p.horizon} ${unit}後</span><b class="${cls(p.median - last)}">${fmtPct(p.median / last - 1, 1)}</b></div>
+    <div class="o-head"><svg><use href="#i-spark"/></svg><span class="o-long">AI 預言家 · ${p.horizon} ${unit}後</span><span class="o-short">AI 預言</span><b class="${cls(p.median - last)}">${fmtPct(p.median / last - 1, 1)}</b></div>
     <div class="o-body">
       <div class="big ${cls(p.median - last)}">${fmtP(p.median)}</div>
       <div class="bar2"><i style="width:${up}%"></i><i style="width:${100 - up}%"></i></div>
@@ -724,7 +747,10 @@ function renderOracle() {
       <div class="tiny">${p.signals.join(' · ')}<br>蒙地卡羅 600 條路徑的玩具模型，純屬娛樂，不構成投資建議。</div>
     </div>`;
 }
-$('oracleMini').onclick = () => $('oracleMini').classList.toggle('collapsed');
+$('oracleMini').onclick = () => {
+  const open = $('oracleMini').classList.toggle('collapsed') === false;
+  if (open) $('achPanel').classList.add('hidden');
+};
 
 function say(text, ms = 2600, force = false) {
   const now = performance.now();
@@ -965,9 +991,9 @@ function showSummary({ gameOver, ret, bonus, best, isBest }) {
       <div><span>💣 被炸</span><b>${ride.hits}</b></div>
       ${gameOver ? '' : `<div><span>💰 持股＋存活獎金</span><b>+${bonus.toLocaleString()}</b></div>`}
     </div>` : '';
-  const guessLine = ui.guess === 'skip' ? '你這次沒有猜。' : g ? `✅ 你猜「${ui.guess === 'up' ? '更高' : '更低'}」—— 猜對了！累積猜對 ${store.state.correct} 次` : `❌ 你猜「${ui.guess === 'up' ? '更高' : '更低'}」—— 市場不同意。`;
+  const guessLine = ui.guess === 'skip' ? '這趟沒有猜，純坐。' : g ? `✅ 你猜「${ui.guess === 'up' ? '漲上去' : '跌下來'}」—— 猜對了！累積猜對 ${store.state.correct} 次` : `❌ 你猜「${ui.guess === 'up' ? '漲上去' : '跌下來'}」—— 市場不同意，下次再來。`;
   $('summary').innerHTML = `
-    <h2>${gameOver ? '出軌了！💥 Game Over' : `抵達終點！${ret >= 0 ? '🎉' : '🫠'}`}</h2>
+    <h2>${gameOver ? '出軌了！💥 Game Over' : ret >= 0 ? '抵達終點！這趟有賺 🎉' : '抵達終點……這趟被套 🫠'}</h2>
     <div class="muted">${data.displayName} · ${fmtDate(track.times[0])} → ${fmtDate(track.times[N - 1])}${data.simulated ? ' · 模擬資料' : ''}</div>
     ${gameBox}
     ${sparkline()}
@@ -987,10 +1013,10 @@ function showSummary({ gameOver, ret, bonus, best, isBest }) {
       上漲機率 ${(pred.pUp * 100).toFixed(0)}%，信心 ${pred.confidence}/100。<br>${pred.mood}：「${pred.fortune}」</div>
     ${ride.newAch.length ? `<div class="muted" style="margin-top:10px">這趟解鎖的成就</div><div class="newach">${ride.newAch.map((a) => `<div><span class="gicon sm">${a.ico}</span>${a.name}</div>`).join('')}</div>` : ''}
     <div class="btnrow"><button class="primary" id="againBtn">再坐一次</button><button id="shareBtn"><svg><use href="#i-share"/></svg> 分享這趟</button><button id="otherBtn">換一檔</button></div>
-    <a class="promo" href="https://sectools.tw/?utm_source=stockcoaster&amp;utm_medium=referral&amp;utm_campaign=summary" target="_blank" rel="noopener"><span class="gicon sm">🧰</span><span>坐完了？到 <b>SecTools.tw</b> 逛逛更多免費工具和小遊戲</span><svg><use href="#i-arrow"/></svg></a>
+    <a class="promo" href="https://sectools.tw/?utm_source=stockcoaster&amp;utm_medium=referral&amp;utm_campaign=summary" target="_blank" rel="noopener"><span class="gicon sm">🧰</span><span>還沒玩夠？<b>SecTools.tw</b> 有火車駕駛、飛行模擬、資安扭蛋機，免費隨點即玩</span><svg><use href="#i-arrow"/></svg></a>
     <div class="disclaimer">股價資料來源 Yahoo Finance／FinMind（可能有延遲，已自動還原分割）。AI 預測是統計玩具，純屬娛樂，不構成任何投資建議。</div>`;
-  setTimeout(() => $('summary').classList.remove('hidden'), 1000);
-  $('againBtn').onclick = () => { $('summary').classList.add('hidden'); beginRide(); };
+  setTimeout(() => { $('summary').classList.remove('hidden'); document.body.classList.add('summary-open'); $('oracleMini').classList.add('collapsed'); }, 1000);
+  $('againBtn').onclick = () => { $('summary').classList.add('hidden'); document.body.classList.remove('summary-open'); beginRide(); };
   $('otherBtn').onclick = goHome;
   $('shareBtn').onclick = async () => {
     const url = shareURL();
@@ -1023,9 +1049,11 @@ function sparkline() {
 }
 
 function goHome() {
+  document.body.classList.remove('summary-open');
   mode = 'menu';
   ride = null;
   sfx.silence();
+  music.stop();
   $('summary').classList.add('hidden');
   $('hud').classList.add('hidden');
   $('btnHome').classList.add('hidden');
@@ -1122,7 +1150,12 @@ cv.addEventListener('mousemove', (e) => {
   const sp = spotAt(e);
   cv.style.cursor = sp ? 'pointer' : '';
   tip.classList.toggle('hidden', !sp);
-  if (sp) { tip.textContent = sp.label + ' →'; tip.style.left = `${e.clientX + 14}px`; tip.style.top = `${e.clientY + 10}px`; }
+  if (sp) {
+    tip.textContent = sp.label + ' →';
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    tip.style.left = `${Math.min(e.clientX + 14, innerWidth - tw - 8)}px`; // 靠邊時往內收
+    tip.style.top = `${Math.min(e.clientY + 12, innerHeight - th - 8)}px`;
+  }
 });
 cv.addEventListener('click', (e) => {
   if (ride?.game && mode === 'ride') return; // 遊戲中點畫面是跳躍
@@ -1154,7 +1187,8 @@ function tick(now) {
   drawSky(dt, camX, clock);
   spots.length = 0;
   updateStreet(street, dt, camX, W, onHonk);
-  drawBackdrop(ctx, street, W, offY, GROUND, clock, theme, spots);
+  drawBackdrop(ctx, street, W, offY, GROUND, clock, theme, spots, rainAmt);
+  if (bgSpots.blimp) spots.push(bgSpots.blimp);
   if (track) {
     const cx = Math.round(camX);
     const w = Math.min(W, track.worldW - cx);

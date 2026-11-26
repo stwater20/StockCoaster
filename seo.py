@@ -68,17 +68,17 @@ def head_html(site, code=None, info=None):
         name = info["name"]
         mk = MARKET.get(info.get("market"), "")
         ind = info.get("industry") or ""
-        title = f"{name}（{code}）股價雲霄飛車｜把{name}走勢坐一遍 – StockCoaster 台股"
-        desc = (f"把{name} {code}{'（' + mk + ('・' + ind if ind else '') + '）' if mk else ''}的股價走勢變成像素雲霄飛車："
-                f"漲是爬坡、跌是俯衝。看最大回檔、創新高次數、單日最大漲跌，還有 AI 預言家推估未來 30 個交易日。免費、免安裝。")
+        title = f"{name}股價走勢 {code}｜坐一趟雲霄飛車看懂漲跌 – 股市雲霄飛車"
+        desc = (f"{name}（{code}）股價走勢變成像素雲霄飛車！漲是喀喀喀爬坡、跌是全車尖叫俯衝，"
+                f"一趟看懂{name}的最大回檔、創新高次數與單日最大漲跌，還有 AI 預言家推估未來 30 個交易日。免費免註冊，手機也能玩。")
         url = f"{site}{code}/"
-        kw = f"{name},{code},{name}股價,{code}股價,{name}走勢,台股,股價走勢,雲霄飛車,股市遊戲"
+        kw = f"{name},{code},{name}股價,{code}股價,{name}股價走勢,{name}走勢圖,{name}K線,台股,{ind or '台股'},股市雲霄飛車"
     else:
-        title = "股市雲霄飛車 StockCoaster｜把台股走勢變成像素雲霄飛車"
-        desc = ("輸入台股代號，股價走勢立刻變成像素雲霄飛車：台積電、0050、鴻海、聯發科……漲是爬坡、跌是俯衝，"
-                "附 AI 預言家、成就系統與亮暗主題。免費、免安裝、免註冊。")
+        title = "股市雲霄飛車｜台股走勢變成雲霄飛車，台積電、0050 一鍵發車"
+        desc = ("看盤太無聊？輸入台股代號，股價走勢立刻變成像素雲霄飛車：紅漲綠跌、漲停衝天、跌停俯衝。"
+                "上市櫃股票與 ETF 都能坐，可自訂期間，附 AI 預言家與遊戲模式，免費免註冊。")
         url = site
-        kw = "台股,股價走勢,台積電,0050,雲霄飛車,股市遊戲,K線,AI 股價預測,蒙地卡羅"
+        kw = "台股,股價走勢,台積電股價,0050,ETF,存股,K線,股市遊戲,雲霄飛車,AI 股價預測"
     img = f"{site}og.png"
     app = {
         "@context": "https://schema.org", "@type": "WebApplication", "name": "股市雲霄飛車 StockCoaster",
@@ -88,6 +88,9 @@ def head_html(site, code=None, info=None):
         "publisher": {"@type": "Organization", "name": "SecTools.tw", "url": "https://sectools.tw/"},
     }
     ld = [app]
+    if not code:
+        ld.append({"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [
+            {"@type": "Question", "name": q, "acceptedAnswer": {"@type": "Answer", "text": a}} for q, a in FAQ]})
     if code:
         ld.append({
             "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [
@@ -125,34 +128,55 @@ def _links(codes, stocks, prefix):
     return "<ul class=\"stock-links\">" + "".join(items) + "</ul>"
 
 
+FAQ = [
+    ("股價資料從哪裡來？多久更新一次？",
+     "資料來自 Yahoo Finance 與 FinMind 的公開台股資料，每個交易日收盤後更新。股票分割會自動還原，除權息造成的缺口會特別標示，不會被誤判成跌停。"),
+    ("要付費、下載或註冊嗎？", "完全免費，免安裝、免註冊，用手機或電腦的瀏覽器打開就能玩。"),
+    ("哪些股票可以坐？", "所有上市、上櫃股票和 ETF 都可以，例如台積電 2330、元大台灣50 0050、鴻海 2317、聯發科 2454、長榮 2603、元大高股息 0056、國泰永續高股息 00878。"),
+    ("AI 預言家準嗎？", "AI 預言家用均線、RSI、近月動能和 600 條蒙地卡羅模擬，推估未來 30 個交易日的可能區間。它比較像廟口的籤筒，不是分析師，純屬娛樂，不構成投資建議。"),
+    ("可以分享給朋友嗎？", "每檔股票都有專屬網址，例如 /2330/ 或 /0050/?range=5y。坐完按「分享這趟」，就能把報酬、最大回檔和尖叫次數傳給朋友。"),
+]
+
+
 def about_html(stocks, code=None, info=None, prefix=""):
     parts = []
     if code:
         name = info["name"]
         ind = info.get("industry") or ""
         mk = MARKET.get(info.get("market"), "")
-        parts.append(f"<h2>{_e(name)} {code} 股價雲霄飛車</h2>")
+        desc_ind = f"{mk}{('的' + _e(ind)) if ind else '股票'}" if mk else "股票"
+        parts.append(f"<h2>{_e(name)}（{code}）股價走勢雲霄飛車</h2>")
         parts.append(
-            f"<p>{_e(name)}（{code}）是台股{mk}{('「' + _e(ind) + '」') if ind else ''}的標的。按「發車」就會把{_e(name)}的收盤價鋪成軌道，"
-            f"紅色是上漲、綠色是下跌，一路坐到「今天」之後，再駛入 AI 預言家用蒙地卡羅模擬鋪出的未來 30 日軌道。</p>")
+            f"<p>{_e(name)}是台股{desc_ind}。按下「發車」，{_e(name)}近一年的收盤價會鋪成一整條軌道："
+            f"紅色爬坡是上漲、綠色俯衝是下跌，成交量越大，底下的樓就蓋得越高。爆量那天還會蓋出一棟台北 101。</p>"
+            f"<p>坐到「今天」之後，列車會駛入 AI 預言家鋪的紫色未來軌道，看看{_e(name)}接下來 30 個交易日可能怎麼走。"
+            f"一路上還會看到散戶追高上車、停損下車，比看 K 線圖有感多了。</p>")
         parts.append(
             f'<p>換個期間坐坐看：<a href="./?range=3mo">近 3 個月</a>・<a href="./?range=ytd">今年以來</a>・'
             f'<a href="./?range=1y">近 1 年</a>・<a href="./?range=5y">近 5 年</a>・<a href="./?range=10y">近 10 年</a></p>')
         if ind:
             peers = sorted((c for c, v in stocks.items() if v.get("industry") == ind and c != code), key=lambda c: (c not in KNOWN, c))[:16]
             if peers:
-                parts.append(f"<h3>同產業：{_e(ind)}</h3>" + _links(peers, stocks, prefix))
+                parts.append(f"<h3>{_e(ind)}的其他路線</h3>" + _links(peers, stocks, prefix))
     else:
-        parts.append("<h2>這是什麼？</h2>")
+        parts.append("<h2>把 K 線坐一遍，比看盤更有感</h2>")
         parts.append(
-            "<p>股市雲霄飛車把台股的歷史股價變成一條像素風雲霄飛車軌道：上漲是爬坡、下跌是俯衝，成交量變成軌道下方的城市大樓。"
-            "支援所有上市櫃股票與 ETF，可以選 3 個月到 10 年，或自訂起訖日期。</p>"
-            "<p>坐完會看到期間報酬、最大回檔、創新高次數與單日最大漲跌；AI 預言家則用均線、RSI、動能與 600 條蒙地卡羅路徑，"
-            "推估未來 30 個交易日的可能區間（純屬娛樂，不構成投資建議）。</p>")
+            "<p>看盤看到眼睛花？股市雲霄飛車把台股的歷史股價直接鋪成像素風雲霄飛車軌道。上漲是喀喀喀慢慢爬坡，"
+            "下跌是整車人一起尖叫俯衝；成交量變成底下的台北街景，量越大樓越高。路上還有廟宇、超商、夜市燈籠，跟一台亂切車道的三寶機車。</p>"
+            "<p>上市、上櫃股票和 ETF 全都能坐：台積電、0050、鴻海、聯發科、長榮、0056、00878……輸入代號就發車。"
+            "期間可以選近 3 個月、今年以來、1 年、5 年、10 年，也能自訂起訖日期，回味疫情崩盤、航運狂潮、AI 行情這些經典時刻。</p>"
+            "<h3>坐完你會知道</h3><p>期間報酬、最大回檔、創新高次數、單日最大漲跌，還有你尖叫了幾次。"
+            "想挑戰的話切到遊戲模式：點畫面跳躍、撿金幣跟紅包、閃過利空炸彈，看誰分數最高。</p>")
+        parts.append("<h3>常見問題</h3>" + "".join(f"<p><b>{_e(q)}</b><br>{_e(a)}</p>" for q, a in FAQ))
     parts.append("<h3>熱門路線</h3>" + _links([c for c in POPULAR if c != code], stocks, prefix))
     parts.append(
-        f'<h3>更多免費小工具</h3><p><a href="{SECTOOLS}" target="_blank" rel="noopener">SecTools.tw</a>：'
-        "資安分析、論文研究到生活大小事，一個工具解決一個問題。免費、免安裝、免註冊，還有更多趣味小遊戲。</p>")
+        f'<h3>還想玩點別的？</h3><p><a href="{SECTOOLS}" target="_blank" rel="noopener">SecTools.tw</a> 還有'
+        '<a href="https://train.sectools.tw/?utm_source=stockcoaster" target="_blank" rel="noopener">火車駕駛模擬</a>、'
+        '<a href="https://airplane.sectools.tw/?utm_source=stockcoaster" target="_blank" rel="noopener">桃園飛東京的飛行模擬</a>、'
+        '<a href="https://gacha-sho.sectools.tw/?utm_source=stockcoaster" target="_blank" rel="noopener">資安扭蛋機</a>、'
+        '<a href="https://tesla-roadster.sectools.tw/?utm_source=stockcoaster" target="_blank" rel="noopener">Roadster Rush 閃三寶賽車</a>、'
+        '<a href="https://car.sectools.tw/?utm_source=stockcoaster" target="_blank" rel="noopener">停好停滿停車挑戰</a>'
+        "，全部免費、免安裝、免註冊，隨點即玩。</p>")
     return "\n".join(parts)
 
 
@@ -168,7 +192,7 @@ def render(template, site=SITE_DEFAULT, code=None, stocks=None):
     prefix = "../" if code else ""
     out = re.sub(r"<!--SEO:HEAD-->.*?<!--/SEO:HEAD-->", lambda m: "<!--SEO:HEAD-->" + head_html(site, code, info) + "<!--/SEO:HEAD-->", template, flags=re.S)
     if code:
-        h1 = f"{_e(info['name'])} {code}：要發車了嗎？"
+        h1 = f"{_e(info['name'])}（{code}）股價走勢雲霄飛車"
         out = re.sub(r"<!--SEO:H1-->.*?<!--/SEO:H1-->", lambda m: f"<!--SEO:H1-->{h1}<!--/SEO:H1-->", out, flags=re.S)
         out = out.replace('<html lang="zh-Hant">', f'<html lang="zh-Hant" data-code="{code}">')
         out = _ASSET_RE.sub(lambda m: f'{m.group(1)}="../{m.group(2)}"', out)

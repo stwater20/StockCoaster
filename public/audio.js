@@ -126,8 +126,36 @@ const MOODS = {
 export class Music {
   constructor(sfx) { this.sfx = sfx; this.on = true; this.playing = false; this.mood = 'calm'; this.step = 0; this.next = 0; this.seed = 1; }
   rnd() { this.seed = (this.seed * 16807) % 2147483647; return this.seed / 2147483647; }
+  // ACE-Step 生成的配樂：依心情在兩首之間交叉淡入；讀不到檔案就用合成器
+  useTracks(urls) {
+    this.tracks = {};
+    for (const [k, u] of Object.entries(urls)) {
+      const a = new Audio(u);
+      a.loop = true; a.preload = 'auto'; a.volume = 0;
+      let retried = false;
+      a.addEventListener('error', () => { if (!retried) { retried = true; setTimeout(() => { a.src = u; a.load(); }, 1500); } else delete this.tracks[k]; });
+      this.tracks[k] = a;
+    }
+  }
+  trackFor(m) { return m === 'down' ? (this.tracks.down ? 'down' : 'up') : 'up'; }
+  fade() {
+    const want = this.trackFor(this.mood);
+    for (const [k, a] of Object.entries(this.tracks)) {
+      const target = this.playing && this.on && this.sfx.on && k === want ? 0.42 : 0;
+      a.volume = Math.max(0, Math.min(1, a.volume + (target - a.volume) * 0.08));
+      if (target > 0 && a.paused) a.play().catch(() => {});
+      if (target === 0 && a.volume < 0.01 && !a.paused) a.pause();
+    }
+  }
   start() {
     const ctx = this.sfx.ctx;
+    if (this.tracks && Object.keys(this.tracks).length) {
+      if (this.playing || !this.on) return;
+      this.playing = true;
+      this.timer = setInterval(() => this.fade(), 50);
+      this.fade();
+      return;
+    }
     if (!ctx || this.playing || !this.on) return;
     this.playing = true;
     this.out = ctx.createGain(); this.out.gain.value = 0.0001; this.out.connect(this.sfx.master);
@@ -138,6 +166,11 @@ export class Music {
   stop() {
     if (!this.playing) return;
     this.playing = false;
+    if (this.tracks && Object.keys(this.tracks).length) {
+      const id = setInterval(() => { this.fade(); if (Object.values(this.tracks).every((a) => a.paused)) clearInterval(id); }, 50);
+      clearInterval(this.timer);
+      return;
+    }
     clearInterval(this.timer);
     const o = this.out;
     o.gain.setTargetAtTime(0.0001, this.sfx.ctx.currentTime, 0.3);

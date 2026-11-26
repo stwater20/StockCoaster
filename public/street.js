@@ -13,9 +13,9 @@ export function createStreet() {
 function spawn(st, camX, W, anywhere) {
   const lane = R() < 0.5 ? 0 : 1;
   const r = R();
-  const type = r < 0.55 ? 'scooter' : r < 0.72 ? 'sanbao' : r < 0.8 ? 'roadster' : 'car';
+  const type = r < 0.46 ? 'scooter' : r < 0.6 ? 'sanbao' : r < 0.67 ? 'roadster' : r < 0.77 ? 'taxi' : r < 0.82 ? 'trash' : r < 0.85 ? 'dino' : 'car';
   const dir = LANES[lane].dir * (type === 'sanbao' && R() < 0.4 ? -1 : 1); // 三寶有時逆向
-  const sp = (type === 'roadster' ? 55 : type === 'car' ? 32 : 24) + R() * 14;
+  const sp = (type === 'roadster' ? 55 : type === 'dino' ? 48 : type === 'trash' ? 12 : type === 'car' || type === 'taxi' ? 32 : 24) + R() * 14;
   const x = anywhere ? camX + R() * W : dir > 0 ? camX - 30 - R() * 60 : camX + W + 30 + R() * 60;
   return { type, lane, dir, sp, x, y: LANES[lane].y, ph: R() * 10, color: COLORS[(R() * COLORS.length) | 0], stop: 0 };
 }
@@ -50,8 +50,19 @@ export function updateStreet(st, dt, camX, W, onHonk) {
 }
 
 // 天空與遠景層（畫在世界畫布之前）
-export function drawBackdrop(ctx, st, W, offY, GROUND, time, theme, spots) {
+export function drawBackdrop(ctx, st, W, offY, GROUND, time, theme, spots, rain = 0) {
   const dark = theme === 'dark';
+  // 下雨時天上有颱風
+  if (rain > 0.3) {
+    const cx = Math.round(W * 0.28), cy = Math.round(Math.max(18, offY * 0.4) + 16);
+    ctx.fillStyle = `rgba(220,230,255,${0.5 * rain})`;
+    for (let arm = 0; arm < 3; arm++) for (let t = 0; t < 1; t += 0.03) {
+      const a = time * 1.5 + arm * 2.094 + t * 5, r = 2 + t * 16;
+      ctx.fillRect(Math.round(cx + Math.cos(a) * r), Math.round(cy + Math.sin(a) * r * 0.6), 2, 1);
+    }
+    ctx.fillStyle = '#fff'; ctx.fillRect(cx - 1, cy - 1, 2, 2);
+    spots.push({ x: cx - 18, y: cy - 12, w: 36, h: 24, ...LINKS.typhoon });
+  }
   // 高架軌道
   const ry = offY + GROUND - 54;
   ctx.fillStyle = dark ? 'rgba(120,130,190,.55)' : 'rgba(120,150,190,.55)';
@@ -121,6 +132,28 @@ export function drawRoad(ctx, st, camX, offY, W, time, spots) {
       ctx.fillStyle = '#111'; ctx.fillRect(x - 5, y - 1, 3, 2); ctx.fillRect(x + 3, y - 1, 3, 2);
       ctx.fillStyle = '#ffd23f'; ctx.fillRect(c.dir > 0 ? x + 7 : x - 7, y - 4, 1, 1);
       spots.push({ x: x - 9, y: y - 9, w: 19, h: 11, ...LINKS.roadster });
+    } else if (c.type === 'taxi') {
+      ctx.fillStyle = '#ffd23f'; ctx.fillRect(x - 7, y - 5, 15, 4); ctx.fillRect(x - 4, y - 8, 9, 3);
+      ctx.fillStyle = '#9fd3ff'; ctx.fillRect(x - 3, y - 7, 3, 2); ctx.fillRect(x + 1, y - 7, 3, 2);
+      ctx.fillStyle = '#111'; ctx.fillRect(x - 7, y - 3, 15, 1); ctx.fillRect(x - 5, y - 1, 3, 2); ctx.fillRect(x + 3, y - 1, 3, 2);
+      ctx.fillStyle = '#fff'; ctx.fillRect(x - 1, y - 10, 3, 2);
+      spots.push({ x: x - 9, y: y - 12, w: 19, h: 14, ...LINKS.taxi });
+    } else if (c.type === 'trash') {
+      ctx.fillStyle = '#ffd23f'; ctx.fillRect(x - 10, y - 9, 14, 8);
+      ctx.fillStyle = '#1c9c5a'; ctx.fillRect(x - 10, y - 6, 14, 2);
+      ctx.fillStyle = '#f4f6fa'; ctx.fillRect(c.dir > 0 ? x + 4 : x - 15, y - 7, 6, 6);
+      ctx.fillStyle = '#9fd3ff'; ctx.fillRect(c.dir > 0 ? x + 6 : x - 14, y - 6, 3, 2);
+      ctx.fillStyle = '#111'; ctx.fillRect(x - 8, y - 1, 3, 2); ctx.fillRect(x + 4, y - 1, 3, 2);
+      ctx.fillStyle = '#ff7aa8'; ctx.fillRect(x - 6 + Math.round(Math.sin(time * 2) * 2), y - 14, 1, 3); ctx.fillRect(x - 5 + Math.round(Math.sin(time * 2) * 2), y - 14, 2, 1);
+      spots.push({ x: x - 16, y: y - 17, w: 28, h: 19, ...LINKS.trash });
+    } else if (c.type === 'dino') {
+      const f = Math.floor(time * 10) % 2;
+      ctx.fillStyle = '#3fbf7f';
+      ctx.fillRect(x - 3, y - 8, 6, 5); ctx.fillRect(c.dir > 0 ? x + 2 : x - 5, y - 10, 4, 3);
+      ctx.fillRect(c.dir > 0 ? x - 6 : x + 3, y - 7, 3, 2);
+      ctx.fillRect(x - 2, y - 3, 1, 2 + f); ctx.fillRect(x + 1, y - 3, 1, 3 - f);
+      ctx.fillStyle = '#111'; ctx.fillRect(c.dir > 0 ? x + 4 : x - 4, y - 9, 1, 1);
+      spots.push({ x: x - 8, y: y - 12, w: 16, h: 13, ...LINKS.dino });
     } else {
       ctx.fillStyle = c.color; ctx.fillRect(x - 7, y - 5, 15, 4);
       ctx.fillRect(x - 4, y - 8, 9, 3);

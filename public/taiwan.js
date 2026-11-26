@@ -7,6 +7,15 @@ export const LINKS = {
   gacha: { url: 'https://gacha-sho.sectools.tw/?utm_source=stockcoaster&utm_medium=easter_egg', label: '🎰 資安扭蛋機：轉一顆認識 9 種攻擊手法' },
   roadster: { url: 'https://tesla-roadster.sectools.tw/?utm_source=stockcoaster&utm_medium=easter_egg', label: '🏎️ Roadster Rush：飆車閃過三寶' },
   parking: { url: 'https://car.sectools.tw/?utm_source=stockcoaster&utm_medium=easter_egg', label: '🅿️ 停好停滿：台灣 12 個地獄車位' },
+  taxi: { url: 'https://taxi.sectools.tw/?utm_source=stockcoaster&utm_medium=easter_egg', label: '🚕 計程車跳表估算：邊搭邊算車資' },
+  trash: { url: 'https://tpe-trash-countdown.sectools.tw/?utm_source=stockcoaster&utm_medium=easter_egg', label: '🚛 垃圾車倒數：〈少女的祈禱〉還有幾分鐘到' },
+  temple: { url: 'https://five-hour-temple.sectools.tw/?utm_source=stockcoaster&utm_medium=easter_egg', label: '🏮 五小時宮：求一支籤' },
+  noodle: { url: 'https://beef-noodle-4am.sectools.tw/?utm_source=stockcoaster&utm_medium=easter_egg', label: '🍜 半夜四點牛肉麵：顧火撈麵小遊戲' },
+  oil: { url: 'https://oil-price.sectools.tw/?utm_source=stockcoaster&utm_medium=easter_egg', label: '⛽ 下週油價預測：95／92／98 漲還是跌' },
+  typhoon: { url: 'https://typhoon.sectools.tw/?utm_source=stockcoaster&utm_medium=easter_egg', label: '🌀 颱風假機率計算器：明天放不放？' },
+  dino: { url: 'https://evo.sectools.tw/?utm_source=stockcoaster&utm_medium=easter_egg', label: '🦖 進化狂奔：像素恐龍跑酷' },
+  trend: { url: 'https://trend.sectools.tw/?utm_source=stockcoaster&utm_medium=easter_egg', label: '🔥 台灣即時熱搜：大家現在在搜什麼' },
+  tools: { url: 'https://sectools.tw/tools?utm_source=stockcoaster&utm_medium=easter_egg', label: '🧰 SecTools 神奇無用工具集' },
 };
 
 // 台北 101（高度 h，底部中心在 cx, base）
@@ -100,4 +109,34 @@ export function drawParking(g, x, base) {
   g.fillStyle = '#fff'; g.fillRect(x, base - 18, 7, 1);
   drawText(g, 'P', x + 2, base - 16, '#ffffff');
   return { x, y: base - 18, w: 7, h: 18, ...LINKS.parking };
+}
+
+// 牛肉麵攤（紅招牌、蒸氣）
+export function drawNoodle(g, x, base) {
+  g.fillStyle = '#7a4a24'; g.fillRect(x, base - 9, 12, 9);
+  g.fillStyle = '#e8233a'; g.fillRect(x - 1, base - 13, 14, 4);
+  g.fillStyle = '#ffd23f'; g.fillRect(x + 1, base - 12, 2, 2); g.fillRect(x + 5, base - 12, 2, 2); g.fillRect(x + 9, base - 12, 2, 2);
+  g.fillStyle = '#fff6c0'; g.fillRect(x + 2, base - 7, 8, 3);
+  g.fillStyle = '#ddd'; g.fillRect(x + 3, base - 16, 1, 2); g.fillRect(x + 6, base - 18, 1, 3); g.fillRect(x + 9, base - 16, 1, 2);
+  return { x: x - 1, y: base - 18, w: 14, h: 18, ...LINKS.noodle };
+}
+// 加油站（頂棚 + 價格看板）
+export function drawGas(g, x, base) {
+  g.fillStyle = '#e8eaf0'; g.fillRect(x, base - 16, 22, 3);
+  g.fillStyle = '#1e6fe0'; g.fillRect(x, base - 13, 22, 1);
+  g.fillStyle = '#8a90a8'; g.fillRect(x + 3, base - 13, 1, 13); g.fillRect(x + 18, base - 13, 1, 13);
+  g.fillStyle = '#e8233a'; g.fillRect(x + 8, base - 7, 3, 7); g.fillRect(x + 13, base - 7, 3, 7);
+  g.fillStyle = '#fff'; g.fillRect(x + 9, base - 6, 1, 2); g.fillRect(x + 14, base - 6, 1, 2);
+  g.fillStyle = '#20243a'; g.fillRect(x + 24, base - 20, 9, 12);
+  g.fillStyle = '#8a90a8'; g.fillRect(x + 28, base - 8, 1, 8);
+  drawText(g, '95', x + 25, base - 18, '#ffd23f'); drawText(g, '98', x + 25, base - 13, '#7fe0c8');
+  return { x, y: base - 20, w: 33, h: 20, ...LINKS.oil };
+}
+// 屋頂看板
+export function drawBillboard(g, x, top) {
+  g.fillStyle = '#8a90a8'; g.fillRect(x + 4, top - 3, 1, 3); g.fillRect(x + 30, top - 3, 1, 3);
+  g.fillStyle = '#141633'; g.fillRect(x, top - 12, 36, 9);
+  g.fillStyle = '#ffb020'; g.fillRect(x, top - 12, 36, 1);
+  drawText(g, 'SECTOOLS', x + 3, top - 10, '#ffffff');
+  return { x, y: top - 13, w: 36, h: 13, ...LINKS.tools };
 }

@@ -51,18 +51,18 @@
   <!-- 選股面板 -->
   <section id="menu" class="panel glass menu">
     <h1><!--SEO:H1-->今天想坐哪一檔？<!--/SEO:H1--></h1>
-    <p class="sub">股價就是軌道：漲是爬坡、跌是俯衝，紅漲綠跌。可以放著自動看，也能切到遊戲模式跳躍吃金幣。</p>
+    <p class="sub">把台股走勢鋪成雲霄飛車：紅漲綠跌、漲停衝天、跌停俯衝。放著自動看很療癒，切到遊戲模式還能邊坐邊撿紅包。</p>
 
     <div class="label">熱門路線</div>
     <div class="chips" id="presetChips"></div>
 
-    <div class="label">自選代號</div>
+    <div class="label">自己挑一檔</div>
     <div class="row">
-      <input id="codeInput" list="codeList" placeholder="輸入代號，例如 2603、6488、00878" maxlength="10" />
+      <input id="codeInput" list="codeList" placeholder="輸入代號或從清單挑，例如 2603、6488、00878" maxlength="10" />
       <datalist id="codeList"></datalist>
     </div>
 
-    <div class="label">搭乘期間</div>
+    <div class="label">要坐多久</div>
     <div class="seg" id="rangeSeg">
       <button data-v="3mo">3 個月</button>
       <button data-v="6mo">半年</button>
@@ -80,31 +80,33 @@
       <button id="dateApply">套用</button>
     </div>
 
-    <div class="label">乘客</div>
+    <div class="label">誰陪你坐</div>
     <div class="seg passengers" id="paxSeg"></div>
 
     <div class="label">模式</div>
     <div class="seg" id="modeSeg">
-      <button data-v="auto" class="on">🎢 自動觀賞</button>
-      <button data-v="game">🎮 遊戲模式</button>
+      <button data-v="auto" class="on">🎢 自動觀賞：放著看就好</button>
+      <button data-v="game">🎮 遊戲模式：撿紅包、躲炸彈</button>
     </div>
 
-    <div class="label">發車前猜猜看：終點會比起點……</div>
+    <div class="label">發車前猜猜看：抵達終點時，股價會比出發時……</div>
     <div class="seg" id="guessSeg">
-      <button data-v="up">📈 更高</button>
-      <button data-v="down">📉 更低</button>
-      <button data-v="skip" class="on">🤷 不猜</button>
+      <button data-v="up">📈 漲上去</button>
+      <button data-v="down">📉 跌下來</button>
+      <button data-v="skip" class="on">🤷 不猜，純坐</button>
     </div>
 
-    <button id="btnGo" class="go">發車！</button>
-    <div id="menuMsg" class="msg"></div>
+    <div class="go-bar">
+      <button id="btnGo" class="go">發車！</button>
+      <div id="menuMsg" class="msg"></div>
+    </div>
 
     <details class="about">
-      <summary>關於股市雲霄飛車・熱門路線</summary>
+      <summary>這是什麼？常見問題・熱門路線</summary>
       <div class="about-body"><!--SEO:ABOUT--><!--/SEO:ABOUT--></div>
     </details>
     <a class="promo" href="https://sectools.tw/?utm_source=stockcoaster&amp;utm_medium=referral&amp;utm_campaign=menu" target="_blank" rel="noopener">
-      <span class="gicon sm">🧰</span><span><b>SecTools.tw</b> 更多免費工具與小遊戲：免安裝、免註冊，隨點即用</span><svg><use href="#i-arrow"/></svg>
+      <span class="gicon sm">🧰</span><span><b>SecTools.tw</b>：火車駕駛、飛行模擬、資安扭蛋機……更多免費小遊戲，免註冊隨點即玩</span><svg><use href="#i-arrow"/></svg>
     </a>
   </section>
 
@@ -115,13 +117,13 @@
       <div class="hud-date" id="hudDate">—</div>
       <div class="hud-price"><span id="hudPrice">—</span> <small id="hudChg">—</small></div>
       <div class="hud-ret">累積 <b id="hudRet">0%</b></div>
+      <div class="hud-score hidden" id="scoreCard"><span id="hudHearts"></span><b id="hudScore">0</b><small id="hudCombo"></small></div>
     </div>
     <div class="hud-card glass gauges">
       <div class="g"><span>時速</span><b id="hudSpeed">0</b><small>km/h</small></div>
       <div class="g"><span>G 力</span><b id="hudG">1.0</b><small>G</small></div>
       <div class="g scream"><span>尖叫指數</span><div class="meter"><i id="hudScream"></i></div></div>
     </div>
-    <div class="hud-card glass scorecard hidden" id="scoreCard"><span id="hudHearts"></span><b id="hudScore">0</b><small id="hudCombo"></small></div>
     <div class="hud-card glass minimap"><canvas id="minimap" width="200" height="26"></canvas></div>
     <button class="hud-card glass oracle collapsed" id="oracleMini"></button>
     <div class="commentary" id="commentary"></div>

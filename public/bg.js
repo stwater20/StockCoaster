@@ -1,5 +1,6 @@
 // 華麗像素背景：多層視差（極光／流星／飛鳥、日月光暈、雪山、雲、台北 101、摩天輪、跑馬燈飛船、霓虹城市）
 import { drawText, textWidth } from './pixel.js';
+import { LINKS } from './taiwan.js';
 
 const hash = (n) => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
 const lerp = (a, b, t) => a.map((x, i) => x + (b[i] - x) * t);
@@ -268,5 +269,7 @@ export function drawBackground(ctx, o) {
   // 跑馬燈飛船（視差 0.2，慢慢飄）
   const span = W + 140;
   const bx = Math.round(((W * 0.6 - camX * 0.2 + time * 6) % span + span) % span - 70);
-  blimp(ctx, bx, Math.round(offY * 0.3 + 20 + Math.sin(time * 0.6) * 3), P, ticker || 'STOCKCOASTER', time);
+  const by = Math.round(offY * 0.3 + 20 + Math.sin(time * 0.6) * 3);
+  blimp(ctx, bx, by, P, ticker || 'STOCKCOASTER', time);
+  return { x: bx - 4, y: by, w: 52, h: 18, ...LINKS.trend };
 }

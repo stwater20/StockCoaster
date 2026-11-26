@@ -13,7 +13,7 @@
     (function () {
       var t = null;
       try { t = localStorage.getItem('stockcoaster.theme'); } catch (e) {}
-      if (!t) t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+      if (!t) { var h = (new Date().getUTCHours() + 8) % 24; t = h >= 6 && h < 18 ? 'light' : 'dark'; } // 預設跟著台灣時間：白天亮、晚上暗
       document.documentElement.dataset.theme = t;
     })();
   </script>
@@ -42,7 +42,7 @@
     <div class="logo glass" id="logo"><canvas id="logoSprite" width="14" height="15"></canvas><b>股市雲霄飛車</b><span>台股版</span></div>
     <div class="tools">
       <button class="icon glass" id="btnAch" title="成就"><svg><use href="#i-trophy"/></svg><span id="achCount">0/0</span></button>
-      <button class="icon glass round" id="btnTheme" title="切換亮／暗"><svg><use href="#i-sun"/></svg></button>
+      <button class="icon glass round" id="btnTheme" title="白天／夜晚模式" aria-label="切換白天／夜晚模式"><svg><use href="#i-sun"/></svg></button>
       <button class="icon glass round" id="btnSound" title="音效"><svg><use href="#i-sound"/></svg></button>
       <button class="icon glass round hidden" id="btnHome" title="回選單"><svg><use href="#i-home"/></svg></button>
     </div>

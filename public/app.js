@@ -1,13 +1,16 @@
 import { PRESETS, KNOWN, RANGES, loadStock, resolveDates, spanDays } from './data.js';
 import { drawBackground } from './bg.js';
 import { placeItems, collide, drawItems, popText, drawFloats, JUMP_V, JUMP_G } from './game.js';
+import { draw101, drawTemple, drawStore, drawBoba, drawLanterns, drawGacha, drawParking } from './taiwan.js';
+import { createStreet, updateStreet, drawBackdrop, drawRoad } from './street.js';
 import { predict } from './ai.js';
 import { ACHIEVEMENTS, store } from './achievements.js';
-import { Sfx } from './audio.js';
+import { Sfx, Music } from './audio.js';
 import { drawText, textWidth, carSprite } from './pixel.js';
 
 const $ = (id) => document.getElementById(id);
 const sfx = new Sfx();
+const music = new Music(sfx);
 const PAX = ['🐻', '🐱', '🐸', '🧓', '🦖', '🐧'];
 
 // ---- 世界座標（像素）----
@@ -193,12 +196,21 @@ function renderWorld(tr) {
   // 成交量城市：每個交易日一棟樓
   const vols = tr.data.points.map((p) => p.v || 0);
   const maxV = Math.max(...vols) || 1;
+  const iMaxV = vols.indexOf(maxV);
+  const dark = theme === 'dark';
+  let skip = 0, lastTop = null;
   for (let i = 0; i < N; i++) {
     const w = Math.max(3, dx - 1);
     const bx = X0 + i * dx - Math.floor(w / 2);
     const h = Math.round(8 + Math.sqrt(vols[i] / maxV) * 58);
     const top = GROUND - h;
     const r = chgOf(i);
+    if (skip) { skip--; continue; }
+    // 台灣街景：成交量最大那天是 101，其餘偶爾是廟、超商
+    if (i === iMaxV) { draw101(g, X0 + i * dx, GROUND, h + 22, dark); lastTop = null; continue; }
+    const kind = rnd();
+    if (h < 26 && kind < 0.09 && i + 2 < N && i + 2 !== iMaxV && i + 1 !== iMaxV) { drawTemple(g, bx, GROUND, dx * 3 - 1); skip = 2; lastTop = null; continue; }
+    if (h < 30 && kind < 0.2) { drawStore(g, bx, GROUND, w, Math.max(10, h)); lastTop = null; continue; }
     const [hh, ss, ll] = th.bld;
     g.fillStyle = `hsl(${(hh * 360 + (rnd() - 0.5) * 18) | 0} ${ss * 100}% ${((ll + (rnd() - 0.5) * 0.06) * 100).toFixed(1)}%)`;
     g.fillRect(bx, top, w, h);
@@ -208,6 +220,9 @@ function renderWorld(tr) {
       for (let wx = bx + 1; wx < bx + w - 1; wx += 2)
         if (rnd() < 0.38) { g.fillStyle = th.win[(rnd() * th.win.length) | 0]; g.fillRect(wx, wy, 1, 1); }
     if (rnd() < 0.08 && h > 40) { g.fillStyle = '#ff4757'; g.fillRect(bx + (w >> 1), top - 4, 1, 4); }
+    else if (rnd() < 0.06 && w >= 5) drawBoba(g, bx + (w >> 1) - 2, top);
+    if (lastTop && rnd() < 0.12) drawLanterns(g, lastTop[0], lastTop[1] + 2, bx + 1, top + 2);
+    lastTop = [bx + w - 1, top];
   }
 
   // 支架（AI 段沒有——未來本來就沒有根據）
@@ -255,13 +270,20 @@ function renderWorld(tr) {
     prev = y;
   }
 
-  // 地面 + 日期尺
+  // 地面：人行道、馬路、日期尺
   g.fillStyle = th.dirt; g.fillRect(0, GROUND, worldW, LH - GROUND);
   g.fillStyle = th.dirt2;
-  for (let y = GROUND + 4; y < LH; y += 3) for (let x = (y * 7) % 5; x < worldW; x += 5) g.fillRect(x, y, 1, 1);
+  for (let y = GROUND + 14; y < LH; y += 3) for (let x = (y * 7) % 5; x < worldW; x += 5) g.fillRect(x, y, 1, 1);
   g.fillStyle = th.grass; g.fillRect(0, GROUND, worldW, 2);
+  g.fillStyle = dark ? '#2c2f40' : '#6d7385'; g.fillRect(0, GROUND + 2, worldW, 10);
+  g.fillStyle = dark ? '#d8c070' : '#ffffff';
+  for (let x = 0; x < worldW; x += 8) g.fillRect(x, GROUND + 7, 4, 1);
+  g.fillStyle = dark ? '#555a70' : '#b7bccb'; g.fillRect(0, GROUND + 12, worldW, 1);
   g.fillStyle = th.grass2;
-  for (let x = 0; x < worldW; x += 3) g.fillRect(x, GROUND - ((x * 13) % 7 === 0 ? 1 : 0), 1, 3);
+  for (let x = 0; x < worldW; x += 3) g.fillRect(x, GROUND - ((x * 13) % 7 === 0 ? 1 : 0), 1, 2);
+  // 彩蛋：扭蛋機、停車場（可以點）
+  tr.spots = [drawGacha(g, PAD + 34, GROUND), drawGacha(g, Xend + 64, GROUND)];
+  for (let x = X0 + 520; x < Xtoday; x += 1100) tr.spots.push(drawParking(g, x, GROUND));
   let lastKey = '', lastLabelX = -999;
   for (let i = 0; i < T; i++) {
     const d = tpe(times[i]);
@@ -271,9 +293,9 @@ function renderWorld(tr) {
     const x = X0 + i * dx;
     const col = i >= N ? '#b57bff' : th.label;
     g.fillStyle = col;
-    g.fillRect(x, GROUND + 2, 1, 3);
+    g.fillRect(x, GROUND + 13, 1, 2);
     const txt = `${String(d.getUTCFullYear()).slice(2)}/${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-    if (x - lastLabelX > textWidth(txt) + 6) { drawText(g, txt, x + 2, GROUND + 6, col); lastLabelX = x; }
+    if (x - lastLabelX > textWidth(txt) + 6) { drawText(g, txt, x + 2, GROUND + 15, col); lastLabelX = x; }
   }
 
   // 起點站
@@ -329,6 +351,7 @@ function drawSky(dt, camX, time) {
       key = Math.abs(r) < 0.02 ? 'base' : r > 0 ? 'up' : 'down';
     }
   }
+  music.setMood(key === 'base' ? 'calm' : key);
   const k = Math.min(1, dt * 1.2);
   sky.top = mix(sky.top, hex(th.sky[key][0]), k);
   sky.bot = mix(sky.bot, hex(th.sky[key][1]), k);
@@ -395,11 +418,13 @@ function speedLines(v) {
 }
 
 // ---------- 列車 ----------
-const carAng = [0, 0, 0];
+const carAng = Array(12).fill(0);
 function drawTrain(camX) {
   const s = ride ? ride.s : track.sStart;
-  const pax = ui.moon ? '🚀' : ui.pax;
-  for (let k = 2; k >= 0; k--) {
+  const me = ui.moon ? '🚀' : ui.pax;
+  const cars = ride ? ride.cars : [me, me, me];
+  for (let k = cars.length - 1; k >= 0; k--) {
+    const pax = k === 0 ? me : cars[k];
     const x = xAtS(Math.max(0, s - k * 9.5));
     const xi = Math.round(x);
     const ang = Math.atan2(track.ys[Math.min(xi + 6, track.worldW - 1)] - track.ys[Math.max(xi - 6, 0)], 12);
@@ -598,6 +623,7 @@ async function startRide() {
   $('btnGo').disabled = false;
   if (tr) beginRide();
 }
+function startMusic() { sfx.init(); music.start(); }
 
 function beginRide() {
   ride = {
@@ -605,11 +631,14 @@ function beginRide() {
     runMax: track.closes[0], maxDD: 0, highs: 0, screams: 0, topV: 0, maxG: 1, minG: 1,
     bestDay: 0, worstDay: 0, g: 1, scream: 0, lastSay: 0, inFuture: false, newAch: [], lastBoom: 0,
     bubble: null,
+    cars: Array(3).fill(ui.moon ? '🚀' : ui.pax),
     // 遊戲模式
     game: ui.mode === 'game', items: ui.mode === 'game' ? placeItems(track) : [],
     score: 0, hearts: 3, combo: 0, maxCombo: 0, lastCoin: -9, coins: 0, hits: 0, jumpH: 0, jumpV: 0, jumps: 2, inv: 0,
   };
   mode = 'ride';
+  startMusic();
+  music.setMood('calm');
   $('menu').classList.add('hidden');
   $('summary').classList.add('hidden');
   $('hud').classList.remove('hidden');
@@ -732,7 +761,8 @@ function onNewDay(d) {
     }
     return;
   }
-  if (!weekly) {
+  const gap = !weekly && Math.abs(chg) > 0.105; // 超過漲跌幅限制 → 除權息、減資等缺口，不算漲跌停
+  if (!weekly && !gap) {
     if (chg <= -0.05) unlock('drop5');
     if (chg <= -0.095) unlock('limitdown');
     if (chg >= 0.095) unlock('limitup');
@@ -753,20 +783,61 @@ function onNewDay(d) {
         firework(x + 30 + Math.random() * 60, Math.max(12, y - 40 - Math.random() * 30));
         sfx.boom();
       }
-      if (ride.highs === 1 || ride.highs % 8 === 0) say(`🎆 創區間新高 ${fmtP(price)}！第 ${ride.highs} 次`);
+      if (ride.highs % 2 === 0 && ride.cars.length < 10) addCar();
+      else if (ride.highs === 1 || ride.highs % 8 === 0) say(`🎆 創區間新高 ${fmtP(price)}！第 ${ride.highs} 次`);
     }
   }
   ride.maxDD = Math.min(ride.maxDD, price / ride.runMax - 1);
 
+  if (chg <= (weekly ? -0.06 : -0.03) && ride.cars.length > 1) dropCar(chg);
   const ahead = Math.min(N - 1, dd + 6);
   const fwd = closes[ahead] / price - 1;
   const u = weekly ? '週' : '日';
-  if (!weekly && Math.abs(chg) >= 0.095) { say(chg > 0 ? `🧨 ${fmtDate(track.times[dd])} 漲停！${fmtPct(chg)}` : `🕳️ 跌停！${fmtPct(chg)}，有人在尖叫`, 3000, true) }
+  if (gap) say(chg < 0 ? `✂️ 除權息缺口 ${fmtPct(chg)}：股價往下跳，配到的股利會補回來` : `🔼 跳空缺口 ${fmtPct(chg)}（減資、分割後恢復交易之類）`, 3200, true);
+  else if (!weekly && Math.abs(chg) >= 0.095) { say(chg > 0 ? `🧨 ${fmtDate(track.times[dd])} 漲停！${fmtPct(chg)}` : `🕳️ 跌停！${fmtPct(chg)}，有人在尖叫`, 3000, true) }
   else if (chg <= (weekly ? -0.08 : -0.04)) { say(`📉 單${u}重挫 ${fmtPct(chg)}，自由落體！`) }
   else if (chg >= (weekly ? 0.08 : 0.04)) say(`📈 單${u}大漲 ${fmtPct(chg)}，衝啊！`);
   else if (fwd <= -0.08) say(`⚠️ 前方 ${ahead - dd} ${weekly ? '週' : '天'}累跌 ${fmtPct(fwd, 1)}，抓緊扶手！`);
   else if (fwd >= 0.08) say(`⛰️ 前方是一段 ${fmtPct(fwd, 1)} 的爬坡，喀喀喀喀…`);
   else if (price / ride.runMax - 1 < -0.15 && Math.random() < 0.05) say(`🌧️ 距高點已跌 ${fmtPct(price / ride.runMax - 1, 1)}，開始下雨了`);
+}
+
+// ---------- 車廂上下車 ----------
+const BOARDERS = ['🥬', '🥬', '🥬', '🧑', '👵', '🐶', '🐱', '🐸', '🐧'];
+function addCar() {
+  const p = pick(BOARDERS);
+  ride.cars.push(p);
+  const n = ride.cars.length;
+  const lines = {
+    '🥬': [`🥬 韭菜看到新高衝進來了！列車接到 ${n} 節`, `🥬 又一顆韭菜上車，排隊等著被割（${n} 節）`],
+    '🧑': [`🧑 上班族看到新聞追高上車，現在 ${n} 節`, `🧑 「我同事說會漲」——第 ${n} 節車廂已掛上`],
+    '👵': [`👵 菜籃族阿嬤也上車了，列車 ${n} 節`, `👵 阿嬤：「台積電我從 50 塊抱到現在」（${n} 節）`],
+  }[p] || [`${p} 連路過的都忍不住上車，共 ${n} 節`];
+  say(pick(lines), 2600, true);
+  sfx.blip?.(400, 900, 0.18, 'square', 0.07);
+  if (n >= 10) unlock('crowd');
+}
+const fallen = [];
+function dropCar(chg) {
+  const k = ride.cars.length - 1;
+  const p = ride.cars.pop();
+  const x = xAtS(Math.max(0, ride.s - k * 9.5)), y = yAtX(x);
+  fallen.push({ x, y, vx: -25 - Math.random() * 20, vy: -70, ang: carAng[k], va: -3 - Math.random() * 4, pax: p, life: 0 });
+  const n = ride.cars.length;
+  say(pick([`🏃 停損下車！跌了 ${fmtPct(chg, 1)}，列車剩 ${n} 節`, `💸 受不了洗盤，最後一節直接脫鉤（剩 ${n} 節）`, `🫠 被甩下車了……剩 ${n} 節，抱緊的才是贏家？`, `${p} 喊著「我早就說會跌」跳車了，剩 ${n} 節`]), 2600, true);
+  sfx.hop?.();
+}
+function drawFallingCars(dt, camX) {
+  for (let i = fallen.length - 1; i >= 0; i--) {
+    const f = fallen[i];
+    f.life += dt; f.vy += 220 * dt; f.x += f.vx * dt; f.y += f.vy * dt; f.ang += f.va * dt;
+    if (f.y > LH + 30) { fallen.splice(i, 1); continue; }
+    ctx.save();
+    ctx.translate(Math.round(f.x - camX), Math.round(f.y + offY));
+    ctx.rotate(f.ang);
+    ctx.drawImage(carSprite(f.pax, false), -7, -15);
+    ctx.restore();
+  }
 }
 
 function checkGuess(r) {
@@ -1027,6 +1098,38 @@ $('logo').addEventListener('click', () => {
   if (logoClicks % 7 === 0) { unlock('curious'); toast('📚', '台股冷知識', TRIVIA[Math.floor(Math.random() * TRIVIA.length)]); }
 });
 
+// ---------- 街道、彩蛋 hotspot ----------
+const street = createStreet();
+const spots = [];
+function onHonk(c) {
+  if (!ride || mode !== 'ride') return;
+  const sx = c.x - camX;
+  if (sx < 0 || sx > W) return;
+  sfx.blip?.(520, 480, 0.12, 'square', 0.05);
+  if (!ride.sanbaoSaid) { ride.sanbaoSaid = true; say(pick(SANBAO_LINES), 2600); }
+}
+const SANBAO_LINES = ['🛵 底下有三寶在亂切車道，大家小心！', '🛵 三寶逆向中，比股價還難預測', '🛵 叭叭！機車大軍出沒，三寶請自重', '🛵 那台三寶跟這檔股票一樣，方向燈從來不打'];
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+const tip = document.createElement('div');
+tip.className = 'tip glass hidden';
+document.body.appendChild(tip);
+function spotAt(e) {
+  const r = cv.getBoundingClientRect();
+  const x = ((e.clientX - r.left) / r.width) * W, y = ((e.clientY - r.top) / r.height) * Hc;
+  return spots.find((p) => x >= p.x && x <= p.x + p.w && y >= p.y && y <= p.y + p.h);
+}
+cv.addEventListener('mousemove', (e) => {
+  const sp = spotAt(e);
+  cv.style.cursor = sp ? 'pointer' : '';
+  tip.classList.toggle('hidden', !sp);
+  if (sp) { tip.textContent = sp.label + ' →'; tip.style.left = `${e.clientX + 14}px`; tip.style.top = `${e.clientY + 10}px`; }
+});
+cv.addEventListener('click', (e) => {
+  if (ride?.game && mode === 'ride') return; // 遊戲中點畫面是跳躍
+  const sp = spotAt(e);
+  if (sp) window.open(sp.url, '_blank', 'noopener');
+});
+
 // ---------- 主迴圈 ----------
 let camX = 0, last = performance.now(), clock = 0;
 function tick(now) {
@@ -1049,10 +1152,16 @@ function tick(now) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.imageSmoothingEnabled = false;
   drawSky(dt, camX, clock);
+  spots.length = 0;
+  updateStreet(street, dt, camX, W, onHonk);
+  drawBackdrop(ctx, street, W, offY, GROUND, clock, theme, spots);
   if (track) {
     const cx = Math.round(camX);
     const w = Math.min(W, track.worldW - cx);
     ctx.drawImage(track.canvas, cx, 0, w, LH, 0, offY, w, LH);
+    for (const sp of track.spots || []) spots.push({ ...sp, x: sp.x - cx, y: sp.y + offY });
+    drawRoad(ctx, street, cx, offY, W, clock, spots);
+    drawFallingCars(dt, cx);
     if (ride && ride.items.length) drawItems(ctx, ride.items, cx, offY, W, clock);
     drawTrain(cx);
     updateParts(dt, cx);

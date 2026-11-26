@@ -258,3 +258,4 @@ html.og #menu, html.og .topbar, html.og #toasts { display: none !important; }
 .gamebox em { margin-left: 6px; font-style: normal; font-size: 12px; font-weight: 700; color: #fff; background: linear-gradient(90deg, #ff5a68, #ff9f0a); padding: 2px 8px; border-radius: 99px; }
 .gamebox small { margin-left: 6px; color: var(--muted); font-size: 11px; }
 @media (max-width: 720px) { .scorecard { top: 108px; } .minimap { top: 150px; } .oracle { top: 200px; } }
+.tip { position: fixed; z-index: 45; pointer-events: none; padding: 6px 12px; border-radius: 12px; font-size: 13px; font-weight: 600; background: var(--glass-strong); white-space: nowrap; }

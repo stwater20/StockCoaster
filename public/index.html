@@ -127,7 +127,15 @@
       <div class="g"><span>G 力</span><b id="hudG">1.0</b><small>G</small></div>
       <div class="g scream"><span>尖叫指數</span><div class="meter"><i id="hudScream"></i></div></div>
     </div>
-    <div class="hud-card glass minimap"><canvas id="minimap" width="200" height="26"></canvas></div>
+    <div class="hud-card glass minimap" title="點一下或拖曳，跳到任一天"><canvas id="minimap" width="200" height="26" aria-label="走勢小地圖：點一下或拖曳跳到任一天"></canvas></div>
+    <div class="endchoice glass hidden" id="endChoice">
+      <div class="ec-title">🏁 終點到了！最後要怎麼下車？</div>
+      <div class="ec-btns">
+        <button id="btnFly" class="primary">🚀 一飛衝天</button>
+        <button id="btnFall">🕳️ 直接掉下去</button>
+      </div>
+      <div class="ec-hint" id="ecHint"></div>
+    </div>
     <button class="hud-card glass oracle collapsed" id="oracleMini"></button>
     <div class="commentary" id="commentary"></div>
     <div class="controls glass">

@@ -29,6 +29,9 @@ export const ACHIEVEMENTS = [
   { id: 'score5000', ico: '👑', name: '股神', desc: '遊戲模式單趟 5,000 分' },
   { id: 'derail', ico: '💥', name: '出軌了', desc: '遊戲模式愛心用光' },
   { id: 'crowd', ico: '🚃', name: '人氣爆棚', desc: '列車接到 10 節車廂' },
+  { id: 'liftoff', ico: '🚀', name: '一飛衝天', desc: '終點選擇直接飛出軌道' },
+  { id: 'freefall', ico: '🕳️', name: '自由落體', desc: '終點選擇直接掉下去' },
+  { id: 'timewarp', ico: '⏩', name: '時光跳躍', desc: '點小地圖跳到別的日子' },
   { id: 'moon', ico: '🚀', name: 'To the Moon', desc: '？？？（找找彩蛋）' },
   { id: 'curious', ico: '🐣', name: '好奇寶寶', desc: '？？？（logo 好像可以點）' },
 ];

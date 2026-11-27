@@ -451,10 +451,11 @@ function drawTrain(camX) {
     const q = carAng[k];
     const jh = ride ? Math.round(ride.jumpH) : 0;
     if (ride && ride.inv > 0 && Math.floor(ride.inv * 10) % 2) continue; // 受傷閃爍
-    const px = Math.round(x - camX), py = Math.round(yAtX(x) + offY) - jh;
+    const off = outroOffset(k);
+    const px = Math.round(x - camX + (off ? off.dx : 0)), py = Math.round(yAtX(x) + offY + (off ? off.dy : 0)) - jh;
     ctx.save();
     ctx.translate(px, py);
-    ctx.rotate(q);
+    ctx.rotate(q + (off ? off.rot : 0));
     ctx.drawImage(carSprite(pax, k === 0), -7, -15);
     ctx.restore();
     if (k === 0) drawBubble(px, py - 27);
@@ -495,6 +496,16 @@ function drawMinimap() {
   mctx.fillRect(cx, 0, 1, Hm);
   mctx.fillStyle = '#ffb020';
   mctx.fillRect(cx - 1, y(closes[Math.round(d)]) - 1, 3, 3);
+  if (mmHover >= 0 && mode === 'ride') { // 滑過時顯示日期
+    const hx = Math.round((mmHover / (T - 1)) * (Wm - 1));
+    mctx.fillStyle = 'rgba(255,176,32,.55)';
+    mctx.fillRect(hx, 0, 1, Hm);
+    const label = mmHover >= N ? 'AI' : (() => { const t = new Date(track.times[mmHover] * 1000 + 8 * 3600e3); return `${t.getUTCFullYear()}/${t.getUTCMonth() + 1}/${t.getUTCDate()}`; })();
+    const tw = textWidth(label) + 3, lx = clamp(hx + 3, 0, Wm - tw);
+    mctx.fillStyle = 'rgba(20,22,51,.85)';
+    mctx.fillRect(lx, 0, tw, 7);
+    drawText(mctx, label, lx + 2, 1, '#ffffff');
+  }
 }
 
 // ---------- 選單 ----------
@@ -699,6 +710,9 @@ function beginRide() {
     score: 0, hearts: 3, combo: 0, maxCombo: 0, lastCoin: -9, coins: 0, hits: 0, jumpH: 0, jumpV: 0, jumps: 2, inv: 0,
   };
   mode = 'ride';
+  clearInterval(endTimer);
+  $('endChoice').classList.add('hidden');
+  fallen.length = 0;
   startMusic();
   music.setMood('calm');
   $('menu').classList.add('hidden');
@@ -713,7 +727,7 @@ function beginRide() {
   $('scoreCard').classList.toggle('hidden', !ride.game);
   updateScoreHUD();
   if (ride.game) say('🎮 點畫面／空白鍵跳躍（可二段跳）：吃 🪙 金幣和 🧧 紅包，跳過 💣 利空炸彈！', 4500, true);
-  else say(`🎢 ${track.data.displayName}，${fmtDate(track.times[0])} 出發！`, 2500, true);
+  else say(`🎢 ${track.data.displayName}，${fmtDate(track.times[0])} 出發！點下方小地圖可以跳到任一天`, 3200, true);
 }
 
 function updateScoreHUD() {
@@ -975,8 +989,99 @@ function step(dt) {
   $('hudG').textContent = ride.g.toFixed(1);
   $('hudScream').style.width = `${ride.scream}%`;
 
-  if (ride.s >= track.sStop || (ride.s > track.sEnd && ride.v < 0.3)) finishRide();
+  if (ride.s >= track.sStop || (ride.s > track.sEnd && ride.v < 0.3)) arriveEnd();
 }
+
+// ---------- 終點：一飛衝天 or 掉下去 ----------
+let endTimer = 0;
+function arriveEnd() {
+  mode = 'ending';
+  ride.v = 0; ride.bubble = '?';
+  sfx.silence();
+  const auto = !ride.game;
+  const pick = track.pred.pUp >= 0.5 ? 'fly' : 'fall';
+  let left = auto ? 6 : 0;
+  const hint = () => {
+    $('ecHint').textContent = auto
+      ? `${left} 秒後自動選：AI 推演上漲機率 ${(track.pred.pUp * 100).toFixed(0)}%，${pick === 'fly' ? '衝天' : '跳下去'}`
+      : '選一個，然後看結算';
+  };
+  hint();
+  $('endChoice').classList.remove('hidden');
+  clearInterval(endTimer);
+  if (auto) endTimer = setInterval(() => { left--; if (left <= 0) startOutro(pick); else hint(); }, 1000);
+}
+function startOutro(kind) {
+  clearInterval(endTimer);
+  if (mode !== 'ending' || !ride) return;
+  $('endChoice').classList.add('hidden');
+  mode = 'outro';
+  ride.outro = { kind, t: 0, next: 0, boomed: false };
+  ride.bubble = kind === 'fly' ? '$' : '!!';
+  if (kind === 'fly') { unlock('liftoff'); say('🚀 點火！整列車直接衝出軌道，飛向外太空！', 2500, true); sfx.chime(); }
+  else { unlock('freefall'); say('🕳️ 軌道斷了！全車一起自由落體——啊啊啊啊！', 2500, true); sfx.scream(1.2); }
+}
+function outroStep(dt) {
+  const o = ride.outro;
+  o.t += dt;
+  const x = xAtS(ride.s), y = yAtX(x);
+  if (o.kind === 'fly' && o.t > o.next) {
+    o.next = o.t + 0.35;
+    const off = outroOffset(0);
+    firework(x + off.dx, y + off.dy + 6);
+    sfx.boom();
+  }
+  if (o.kind === 'fall' && !o.boomed && o.t > 1.3) { o.boomed = true; sfx.boom(); }
+  if (o.t > 2.6) finishRide();
+}
+// 每節車廂在結尾動畫的位移（世界座標）
+function outroOffset(k) {
+  const o = ride?.outro;
+  if (!o) return null;
+  if (o.kind === 'fly') {
+    const t = Math.max(0, o.t - k * 0.05);
+    return { dx: 55 * t + 20 * t * t, dy: -(25 * t + 75 * t * t), rot: -Math.min(1.0, t * 1.4) };
+  }
+  const t = Math.max(0, o.t - k * 0.07);
+  return { dx: 20 * t, dy: -18 * t + 130 * t * t, rot: t * 3.2 * (k % 2 ? 1 : -1) };
+}
+$('btnFly').onclick = () => startOutro('fly');
+$('btnFall').onclick = () => startOutro('fall');
+
+// ---------- 小地圖：點一下或拖曳跳到任一天 ----------
+let mmHover = -1;
+function mmDay(e) {
+  const r = mm.getBoundingClientRect();
+  return clamp(Math.round(((e.clientX - r.left) / r.width) * (track.T - 1)), 0, track.T - 1);
+}
+function jumpToDay(d) {
+  if (!ride || mode !== 'ride') return;
+  const { X0, dx, S, closes, N, times } = track;
+  const xi = clamp(Math.round(X0 + d * dx), 0, S.length - 1);
+  ride.s = clamp(S[xi], track.sStart, track.sEnd - 1);
+  ride.v = Math.max(ride.v, 14);
+  ride.day = d - 1;
+  ride.runMax = Math.max(...closes.slice(0, Math.min(d, N - 1) + 1));
+  ride.inFuture = d >= N ? ride.inFuture : false;
+  fallen.length = 0;
+  unlock('timewarp');
+  say(d >= N ? '⏩ 跳到 AI 推演區：接下來是可能的未來走勢' : `⏩ 跳到 ${fmtDate(times[d])}`, 1600, true);
+}
+let mmDrag = false, mmLast = -1;
+mm.addEventListener('pointerdown', (e) => {
+  if (!ride || mode !== 'ride') return;
+  e.preventDefault(); e.stopPropagation();
+  mmDrag = true; mm.setPointerCapture(e.pointerId);
+  mmLast = mmDay(e); jumpToDay(mmLast);
+});
+mm.addEventListener('pointermove', (e) => {
+  if (!track) return;
+  mmHover = mmDay(e);
+  if (mmDrag) { const d = mmHover; if (d !== mmLast) { mmLast = d; jumpToDay(d); } }
+});
+mm.addEventListener('pointerup', () => { mmDrag = false; });
+mm.addEventListener('pointercancel', () => { mmDrag = false; });
+mm.addEventListener('pointerleave', () => { if (!mmDrag) mmHover = -1; });
 
 // ---------- 結算 ----------
 function finishRide(gameOver = false) {
@@ -1036,7 +1141,7 @@ function showSummary({ gameOver, ret, bonus, best, isBest }) {
   const guessLine = ui.guess === 'skip' ? '這趟沒有猜，純坐。' : g ? `✅ 你猜「${ui.guess === 'up' ? '漲上去' : '跌下來'}」—— 猜對了！累積猜對 ${store.state.correct} 次` : `❌ 你猜「${ui.guess === 'up' ? '漲上去' : '跌下來'}」—— 市場不同意，下次再來。`;
   $('summary').innerHTML = `
     <h2>${gameOver ? '出軌了！💥 Game Over' : ret >= 0 ? '抵達終點！這趟有賺 🎉' : '抵達終點……這趟被套 🫠'}</h2>
-    <div class="muted">${data.displayName} · ${fmtDate(track.times[0])} → ${fmtDate(track.times[N - 1])}${data.simulated ? ' · 模擬資料' : ''}</div>
+    <div class="muted">${data.displayName} · ${fmtDate(track.times[0])} → ${fmtDate(track.times[N - 1])}${data.simulated ? ' · 模擬資料' : ''}${ride.outro ? (ride.outro.kind === 'fly' ? ' · 🚀 最後一飛衝天' : ' · 🕳️ 最後直接掉下去') : ''}</div>
     ${gameBox}
     ${sparkline()}
     <div class="stats">
@@ -1091,6 +1196,8 @@ function sparkline() {
 }
 
 function goHome() {
+  clearInterval(endTimer);
+  $('endChoice').classList.add('hidden');
   document.body.classList.remove('summary-open');
   mode = 'menu';
   ride = null;
@@ -1211,6 +1318,7 @@ function tick(now) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now; clock += dt;
   if (mode === 'ride' && track) step(dt * ui.spd);
+  if (mode === 'outro' && ride) outroStep(dt);
 
   if (track) {
     const maxCam = Math.max(0, track.worldW - W);

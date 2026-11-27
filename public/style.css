@@ -345,3 +345,19 @@ body.summary-open #hud .controls, body.summary-open .minimap, body.summary-open 
 .o-chips span b { color: var(--text); font-weight: 600; }
 .o-chips span.up b { color: var(--up); } .o-chips span.down b { color: var(--down); }
 .o-read { font-size: 13px; line-height: 1.5; }
+
+/* 小地圖可點擊跳轉 */
+.minimap { cursor: pointer; touch-action: none; }
+.minimap:hover { box-shadow: 0 0 0 2px var(--accent), 0 8px 24px var(--glass-shadow); }
+/* 終點選擇 */
+.endchoice { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(380px, calc(100vw - 32px));
+  padding: 18px 18px 14px; border-radius: 22px; text-align: center; z-index: 6; animation: ecIn .35s cubic-bezier(.2, 1.4, .4, 1); }
+.ec-title { font-weight: 700; font-size: 17px; margin-bottom: 12px; }
+.ec-btns { display: flex; gap: 10px; }
+.ec-btns button { flex: 1; padding: 12px 8px; border-radius: 14px; border: 1px solid var(--glass-border); background: var(--tint);
+  color: var(--text); font: inherit; font-weight: 700; font-size: 16px; cursor: pointer; }
+.ec-btns button:hover { background: var(--tint-hover); }
+.ec-btns button.primary { background: var(--accent); color: var(--accent-text); border-color: transparent; }
+.ec-hint { margin-top: 10px; font-size: 13px; color: var(--muted); min-height: 1em; }
+@keyframes ecIn { from { opacity: 0; transform: translate(-50%, -40%) scale(.9); } }
+body.summary-open .endchoice { display: none; }

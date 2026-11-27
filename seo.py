@@ -63,7 +63,6 @@ def _e(s):
 
 
 def head_html(site, code=None, info=None):
-    today = datetime.date.today().isoformat()
     if code:
         name = info["name"]
         mk = MARKET.get(info.get("market"), "")
@@ -89,14 +88,25 @@ def head_html(site, code=None, info=None):
     }
     ld = [app]
     if not code:
-        ld.append({"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [
-            {"@type": "Question", "name": q, "acceptedAnswer": {"@type": "Answer", "text": a}} for q, a in FAQ]})
+        ld.append(_faq_ld(FAQ))
     if code:
         ld.append({
             "@context": "https://schema.org", "@type": "BreadcrumbList", "itemListElement": [
                 {"@type": "ListItem", "position": 1, "name": "股市雲霄飛車", "item": site},
                 {"@type": "ListItem", "position": 2, "name": f"{info['name']} {code}", "item": url},
             ]})
+        ld.append(_faq_ld(stock_faq(code, info)))
+    return meta_head(site, title, desc, url, kw, ld)
+
+
+def _faq_ld(pairs):
+    return {"@context": "https://schema.org", "@type": "FAQPage", "mainEntity": [
+        {"@type": "Question", "name": q, "acceptedAnswer": {"@type": "Answer", "text": a}} for q, a in pairs]}
+
+
+def meta_head(site, title, desc, url, kw, ld):
+    today = datetime.date.today().isoformat()
+    img = f"{site}og.png"
     return f"""<title>{_e(title)}</title>
   <meta name="description" content="{_e(desc)}" />
   <meta name="keywords" content="{_e(kw)}" />
@@ -120,6 +130,32 @@ def head_html(site, code=None, info=None):
   <script type="application/ld+json">{json.dumps(ld, ensure_ascii=False)}</script>"""
 
 
+def stock_faq(code, info):
+    """個股頁常見問題：只寫不會過期的事實（代號、市場、產業、玩法）。"""
+    import content
+    name = info["name"]
+    mk = MARKET.get(info.get("market"), "")
+    ind = info.get("industry") or ""
+    is_etf = "ETF" in ind or code.startswith("00")
+    note = content.NOTES.get(code)
+    what = f"{name}的股票代號是 {code}" + (f"，在台股{mk}交易" if mk else "") + (f"，產業分類為{ind}" if ind and not is_etf else "") + "。"
+    if note:
+        what += f"簡單說：{note}。"
+    qs = [(f"{name}的股票代號是多少？是上市還是上櫃？", what),
+          (f"怎麼看{name}（{code}）的股價走勢？",
+           f"打開股市雲霄飛車的 {code} 頁面按「發車」，{name}的歷史收盤價會鋪成雲霄飛車軌道：紅色爬坡是上漲、綠色俯衝是下跌，"
+           "坐完會看到期間報酬、最大回檔、創新高次數與單日最大漲跌。"),
+          (f"可以看{name}幾年前的股價嗎？",
+           f"可以。期間可選近 3 個月、半年、今年以來、1 年、2 年、5 年、10 年，也能自訂起訖日期，最早可以回看到 2000 年（視{name}上市時間而定）。"),
+          (f"{name}未來會漲還是跌？",
+           f"沒有人能保證。坐到「今天」之後，AI 走勢推演會用均線、RSI、動能和 600 條蒙地卡羅模擬，估算{name}未來 30 個交易日的可能區間，"
+           "只是統計推估、純屬娛樂，不構成投資建議。")]
+    if is_etf:
+        qs.insert(1, (f"{name}是什麼類型的 ETF？", f"{name}（{code}）是在台股{mk or ''}掛牌的 ETF。" + (f"特色：{note}。" if note else "")
+                      + "ETF 一次買進一籃子股票，走勢通常比單一個股平穩，可以跟同類型 ETF 各坐一趟比比看。"))
+    return qs
+
+
 def _links(codes, stocks, prefix):
     items = []
     for c in codes:
@@ -139,6 +175,7 @@ FAQ = [
 
 
 def about_html(stocks, code=None, info=None, prefix=""):
+    import content
     parts = []
     if code:
         name = info["name"]
@@ -158,6 +195,18 @@ def about_html(stocks, code=None, info=None, prefix=""):
             peers = sorted((c for c, v in stocks.items() if v.get("industry") == ind and c != code), key=lambda c: (c not in KNOWN, c))[:16]
             if peers:
                 parts.append(f"<h3>{_e(ind)}的其他路線</h3>" + _links(peers, stocks, prefix))
+            slug = content.RAW_TO_IND.get(ind)
+            if slug:
+                parts.append(f'<p><a href="{prefix}industry/{slug[0]}/">📂 看全部{_e(slug[1])}股票</a></p>')
+        th = content.themes_of(code)
+        if th:
+            parts.append("<h3>收錄在這些主題</h3><ul class=\"stock-links\">" + "".join(
+                f'<li><a href="{prefix}theme/{t["slug"]}/">{t["emoji"]} {_e(t["name"])}</a></li>' for t in th) + "</ul>")
+        rd = content.rides_of(code)
+        if rd:
+            parts.append(f"<h3>{_e(name)}的經典名場面</h3><ul class=\"stock-links\">" + "".join(
+                f'<li><a href="{content.ride_url(prefix, r)}">{r["emoji"]} {_e(r["short"])}</a></li>' for r in rd) + "</ul>")
+        parts.append("<h3>常見問題</h3>" + "".join(f"<p><b>{_e(q)}</b><br>{_e(a)}</p>" for q, a in stock_faq(code, info)))
     else:
         parts.append("<h2>把 K 線坐一遍，比看盤更有感</h2>")
         parts.append(
@@ -169,6 +218,7 @@ def about_html(stocks, code=None, info=None, prefix=""):
             "想挑戰的話切到遊戲模式：點畫面跳躍、撿金幣跟紅包、閃過利空炸彈，看誰分數最高。</p>")
         parts.append("<h3>常見問題</h3>" + "".join(f"<p><b>{_e(q)}</b><br>{_e(a)}</p>" for q, a in FAQ))
     parts.append("<h3>熱門路線</h3>" + _links([c for c in POPULAR if c != code], stocks, prefix))
+    parts.append(content.nav_html(prefix))
     parts.append(
         f'<h3>還想玩點別的？</h3><p><a href="{SECTOOLS}" target="_blank" rel="noopener">SecTools.tw</a> 還有'
         '<a href="https://train.sectools.tw/?utm_source=stockcoaster" target="_blank" rel="noopener">火車駕駛模擬</a>、'
@@ -183,22 +233,38 @@ def about_html(stocks, code=None, info=None, prefix=""):
 _ASSET_RE = re.compile(r'(\s(?:href|src))="(?!https?:|#|/|\.\./|data:|mailto:)([^"]*)"')
 
 
+def render_app(template, *, head, about, prefix="", h1=None, sub=None, attrs=""):
+    """把 index.html 範本填好 SEO 內容。prefix 是頁面深度對應的相對路徑（"../"、"../../"）。"""
+    out = re.sub(r"<!--SEO:HEAD-->.*?<!--/SEO:HEAD-->", lambda m: "<!--SEO:HEAD-->" + head + "<!--/SEO:HEAD-->", template, flags=re.S)
+    if h1:
+        out = re.sub(r"<!--SEO:H1-->.*?<!--/SEO:H1-->", lambda m: f"<!--SEO:H1-->{h1}<!--/SEO:H1-->", out, flags=re.S)
+    if sub:
+        out = re.sub(r"<!--SEO:SUB-->.*?<!--/SEO:SUB-->", lambda m: f"<!--SEO:SUB-->{sub}<!--/SEO:SUB-->", out, flags=re.S)
+    if attrs:
+        out = out.replace('<html lang="zh-Hant"', f'<html lang="zh-Hant" {attrs}', 1)
+    if prefix:
+        out = _ASSET_RE.sub(lambda m: f'{m.group(1)}="{prefix}{m.group(2)}"', out)
+    return re.sub(r"<!--SEO:ABOUT-->.*?<!--/SEO:ABOUT-->", lambda m: "<!--SEO:ABOUT-->" + about + "<!--/SEO:ABOUT-->", out, flags=re.S)
+
+
 def render(template, site=SITE_DEFAULT, code=None, stocks=None):
-    """把 index.html 範本變成首頁或個股頁。個股頁位在 /<code>/，相對路徑要多退一層。"""
+    """首頁或個股頁。個股頁位在 /<code>/，相對路徑要多退一層。"""
     stocks = stocks or {}
     info = stocks.get(code) if code else None
     if code and not info:
         info = {"name": KNOWN.get(code, code), "industry": "", "market": ""}
     prefix = "../" if code else ""
-    out = re.sub(r"<!--SEO:HEAD-->.*?<!--/SEO:HEAD-->", lambda m: "<!--SEO:HEAD-->" + head_html(site, code, info) + "<!--/SEO:HEAD-->", template, flags=re.S)
-    if code:
-        h1 = f"{_e(info['name'])}（{code}）股價走勢雲霄飛車"
-        out = re.sub(r"<!--SEO:H1-->.*?<!--/SEO:H1-->", lambda m: f"<!--SEO:H1-->{h1}<!--/SEO:H1-->", out, flags=re.S)
-        out = out.replace('<html lang="zh-Hant">', f'<html lang="zh-Hant" data-code="{code}">')
-        out = _ASSET_RE.sub(lambda m: f'{m.group(1)}="../{m.group(2)}"', out)
-    out = re.sub(r"<!--SEO:ABOUT-->.*?<!--/SEO:ABOUT-->",
-                 lambda m: "<!--SEO:ABOUT-->" + about_html(stocks, code, info, prefix) + "<!--/SEO:ABOUT-->", out, flags=re.S)
-    return out
+    return render_app(template, head=head_html(site, code, info), about=about_html(stocks, code, info, prefix), prefix=prefix,
+                      h1=f"{_e(info['name'])}（{code}）股價走勢雲霄飛車" if code else None, sub=_stock_sub(code, info) if code else None,
+                      attrs=f'data-code="{code}"' if code else "")
+
+
+def _stock_sub(code, info):
+    import content
+    note = content.NOTES.get(code)
+    name = _e(info["name"])
+    lead = f"{name}：{_e(note)}。" if note else f"{name}（{code}）的股價走勢，鋪成一整條雲霄飛車軌道。"
+    return lead + "紅色爬坡是漲、綠色俯衝是跌，按「發車」坐一趟，坐完告訴你最大回檔和創新高次數。"
 
 
 def read_template():

@@ -38,15 +38,21 @@ let NAMES = { ...KNOWN };
   const r = q.get('range');
   if (r && (RANGES[r] || r === 'custom')) ui.range = r;
   const re = /^\d{4}-\d{2}-\d{2}$/;
+  const ds = document.documentElement.dataset; // 經典名場面頁：固定期間
+  if (re.test(ds.start || '') && re.test(ds.end || '')) { ui.range = 'custom'; ui.start = ds.start; ui.end = ds.end; }
   if (re.test(q.get('start') || '') && re.test(q.get('end') || '')) { ui.range = 'custom'; ui.start = q.get('start'); ui.end = q.get('end'); }
 })();
 const rangeKey = () => `${ui.code}|${ui.range}|${ui.range === 'custom' ? ui.start + '~' + ui.end : ''}`;
+const RIDE_PAGE = (() => { const d = document.documentElement.dataset; return d.ride ? `${d.code}|${d.start}|${d.end}` : ''; })();
 function shareURL() {
+  // 還停在名場面頁原本的設定 → 分享名場面網址
+  if (RIDE_PAGE && ui.range === 'custom' && `${ui.code}|${ui.start}|${ui.end}` === RIDE_PAGE) return new URL(`ride/${document.documentElement.dataset.ride}/`, APP_ROOT).href;
   const u = new URL(`${ui.code}/`, APP_ROOT);
   if (ui.range === 'custom') { u.searchParams.set('start', ui.start); u.searchParams.set('end', ui.end); }
   else if (ui.range !== '1y') u.searchParams.set('range', ui.range);
   return u.href;
 }
+const FIRST_URL = shareURL();
 let mode = 'menu';
 let track = null;
 let ride = null;
@@ -504,10 +510,36 @@ function buildMenu() {
     const b = document.createElement('button');
     b.className = 'chip' + (p.code === ui.code ? ' on' : '');
     b.innerHTML = `${p.name} <small>${p.code}${p.tag ? ' · ' + p.tag : ''}</small>`;
-    b.onclick = () => { ui.code = p.code; $('codeInput').value = ''; syncChips(); preview(); };
+    b.onclick = () => {
+      if ([...$('rideChips').children].some((x) => x.classList.contains('on'))) { // 從名場面切回一般路線：期間回到 1 年
+        ui.range = '1y';
+        [...$('rangeSeg').children].forEach((x) => x.classList.toggle('on', x.dataset.v === '1y'));
+        $('dateRow').classList.add('hidden');
+      }
+      ui.code = p.code; $('codeInput').value = ''; syncChips(); preview();
+    };
     b.dataset.code = p.code;
     chips.appendChild(b);
   });
+  // 經典名場面：一鍵套用代號 + 固定期間
+  fetch(new URL('rides.json', APP_ROOT)).then((r) => (r.ok ? r.json() : [])).then((list) => {
+    const box = $('rideChips');
+    list.forEach((r) => {
+      const b = document.createElement('button');
+      b.className = 'chip';
+      b.dataset.ride = `${r.code}|${r.start}|${r.end}`;
+      b.innerHTML = `${r.emoji} ${r.short} <small>${r.code}</small>`;
+      b.onclick = () => {
+        ui.code = r.code; ui.range = 'custom'; ui.start = r.start; ui.end = r.end;
+        $('codeInput').value = PRESETS.some((p) => p.code === r.code) ? '' : r.code;
+        [...$('rangeSeg').children].forEach((x) => x.classList.toggle('on', x.dataset.v === 'custom'));
+        $('dateRow').classList.remove('hidden'); $('dateStart').value = r.start; $('dateEnd').value = r.end;
+        syncChips(); preview();
+      };
+      box.appendChild(b);
+    });
+    syncChips();
+  }).catch(() => {});
   const dl = $('codeList');
   const fill = () => {
     dl.innerHTML = '';
@@ -531,6 +563,7 @@ function buildMenu() {
   seg('rangeSeg', (v) => {
     ui.range = v;
     $('dateRow').classList.toggle('hidden', v !== 'custom');
+    syncChips();
     if (v !== 'custom') return preview();
     if (!ui.start) { const d = resolveDates({ range: '1y' }); ui.start = d.start; ui.end = d.end; }
     $('dateStart').value = ui.start; $('dateEnd').value = ui.end;
@@ -541,7 +574,7 @@ function buildMenu() {
     const a = $('dateStart').value, b = $('dateEnd').value;
     if (!a || !b || a >= b) { $('menuMsg').textContent = '😵 開始日期要早於結束日期'; return; }
     if (spanDays(a, b) < 14) { $('menuMsg').textContent = '😵 期間太短，至少選兩週'; return; }
-    ui.start = a; ui.end = b; preview();
+    ui.start = a; ui.end = b; syncChips(); preview();
   };
   // 套用網址帶進來的設定
   [...$('rangeSeg').children].forEach((b) => b.classList.toggle('on', b.dataset.v === ui.range));
@@ -564,7 +597,12 @@ function seg(id, fn) {
     fn(b.dataset.v);
   });
 }
-function syncChips() { [...$('presetChips').children].forEach((b) => b.classList.toggle('on', b.dataset.code === ui.code)); }
+function syncChips() {
+  const rk = ui.range === 'custom' ? `${ui.code}|${ui.start}|${ui.end}` : '';
+  const onRide = [...$('rideChips').children].some((b) => b.dataset.ride === rk);
+  [...$('presetChips').children].forEach((b) => b.classList.toggle('on', !onRide && b.dataset.code === ui.code));
+  [...$('rideChips').children].forEach((b) => b.classList.toggle('on', b.dataset.ride === rk));
+}
 
 async function preview() {
   const tok = ++previewToken;
@@ -575,7 +613,8 @@ async function preview() {
     buildTrack(d);
     track.key = rangeKey();
     try { history.replaceState(null, '', shareURL()); } catch { /* file:// 之類 */ }
-    document.title = `${d.zhName || d.code}（${d.code}）股價雲霄飛車｜StockCoaster`;
+    // 剛進來的那一檔保留伺服器產生的 SEO 標題；換股或換期間才改
+    if (FIRST_URL !== shareURL()) document.title = `${d.zhName || d.code}（${d.code}）股價雲霄飛車｜StockCoaster`;
     const r = d.points[d.points.length - 1].c / d.points[0].c - 1;
     $('menuMsg').innerHTML = `${d.displayName}：${d.points.length} 個${d.interval === '1wk' ? '週' : '交易日'}，期間 <span class="${cls(r)}">${fmtPct(r)}</span>${d.simulated ? '　⚠️ 連不到資料源，使用模擬軌道（請用 python3 server.py 啟動）' : ''}`;
     return track;

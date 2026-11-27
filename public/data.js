@@ -65,6 +65,8 @@ export async function loadStock(code, q) {
       const r = await fetch(`/api/chart?code=${encodeURIComponent(code)}&start=${start}&end=${end}`);
       const body = await r.json();
       if (r.ok) j = body; else lastErr = new Error(body.error || r.statusText);
+      // Yahoo 早期資料缺很多（例如 0050 只到 2009），開頭差超過一個月就改抓 FinMind
+      if (j && j.points?.length && j.points[0].t * 1000 - Date.parse(start) > 35 * 864e5) j = null;
     } catch (e) { lastErr = e; }
   }
   if (!j) {

@@ -13,6 +13,7 @@ import urllib.parse
 import urllib.request
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
+import content
 import seo
 
 PORT = int(os.environ.get("PORT", "8765"))
@@ -130,7 +131,9 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json(502, {"error": "抓不到 " + code + "：" + str(e)})
         # SEO 頁：首頁與 /2330/ 這類個股頁，用同一份範本即時產生
         m = re.fullmatch(r"/([0-9A-Za-z]{4,6})/?", u.path)
-        if u.path in ("/", "/index.html") or m:
+        if m and m.group(1).lower() in ("ride", "theme", "learn"):
+            m = None
+        if u.path in ("/", "/index.html") or m:  # noqa: SIM102
             if m and not u.path.endswith("/"):
                 self.send_response(301)
                 self.send_header("Location", u.path + "/" + ("?" + u.query if u.query else ""))
@@ -140,6 +143,28 @@ class Handler(SimpleHTTPRequestHandler):
             body = page.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            return self.wfile.write(body)
+        # 長青內容頁：/ride/、/theme/、/industry/、/learn/
+        rel = urllib.parse.unquote(u.path).lstrip("/")
+        if re.match(r"(ride|theme|industry|learn)(/|$)", rel):
+            if not rel.endswith("/"):
+                self.send_response(301)
+                self.send_header("Location", u.path + "/")
+                return self.end_headers()
+            page = content.extra_pages(seo.read_template(), f"http://localhost:{PORT}/", STOCKS).get(rel)
+            if page:
+                body = page.encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                return self.wfile.write(body)
+        if u.path == "/rides.json":
+            body = content.rides_json().encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             return self.wfile.write(body)

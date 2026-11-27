@@ -1,0 +1,47 @@
+/* 長青內容頁（名場面清單、主題、產業、小教室）：跟主程式同一套玻璃風 token */
+:root, :root[data-theme="dark"] {
+  --bg: #0d0f22; --bg2: #2a2050; --text: #f5f5f7; --muted: rgba(235, 235, 245, .62);
+  --glass: rgba(40, 42, 70, .5); --glass-border: rgba(255, 255, 255, .16); --tint: rgba(255, 255, 255, .07);
+  --accent: #ff9f0a; --accent-text: #241400; --link: #ffb340;
+}
+:root[data-theme="light"] {
+  --bg: #dff1ff; --bg2: #fff4e0; --text: #1d1d1f; --muted: rgba(60, 60, 67, .66);
+  --glass: rgba(255, 255, 255, .62); --glass-border: rgba(255, 255, 255, .85); --tint: rgba(255, 255, 255, .6);
+  --accent: #ff9500; --accent-text: #fff; --link: #c25e00;
+}
+* { box-sizing: border-box; }
+body { margin: 0; color: var(--text); background: linear-gradient(160deg, var(--bg), var(--bg2)) fixed; background-color: var(--bg);
+  font: 16px/1.7 -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.top { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 16px; background: var(--glass); backdrop-filter: blur(18px) saturate(1.6); -webkit-backdrop-filter: blur(18px) saturate(1.6);
+  border-bottom: 1px solid var(--glass-border); }
+.brand { display: flex; align-items: center; gap: 8px; color: var(--text); font-weight: 700; }
+.top nav { display: flex; gap: 14px; font-size: 14px; }
+main { max-width: 920px; margin: 0 auto; padding: 18px 16px 40px; }
+.crumbs { font-size: 13px; color: var(--muted); }
+h1 { font-size: clamp(24px, 5vw, 34px); line-height: 1.3; margin: 10px 0 6px; }
+h2 { font-size: 20px; margin: 30px 0 10px; }
+.lede { color: var(--muted); font-size: 17px; margin: 0 0 18px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: 12px; }
+.card { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border-radius: 18px; color: var(--text);
+  background: var(--glass); border: 1px solid var(--glass-border); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  transition: transform .15s; min-width: 0; }
+.card:hover { transform: translateY(-2px); text-decoration: none; }
+.card b { font-size: 17px; }
+.card small { color: var(--muted); font-size: 13px; overflow-wrap: anywhere; }
+.card span { font-size: 14px; }
+.card .go { margin-top: auto; color: var(--link); font-weight: 600; }
+.links { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; list-style: none; }
+.links li a { display: inline-block; padding: 6px 12px; border-radius: 999px; background: var(--tint); border: 1px solid var(--glass-border); }
+.links.small li a { font-size: 14px; padding: 4px 10px; }
+.links small { color: var(--muted); }
+.btn { display: inline-block; padding: 12px 22px; border-radius: 999px; background: var(--accent); color: var(--accent-text); font-weight: 700; }
+.btn:hover { text-decoration: none; filter: brightness(1.05); }
+.toc { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; font-size: 14px; }
+.toc a { padding: 4px 10px; border-radius: 999px; background: var(--tint); border: 1px solid var(--glass-border); }
+.term { padding: 4px 16px 2px; margin: 12px 0; border-radius: 16px; background: var(--glass); border: 1px solid var(--glass-border); scroll-margin-top: 70px; }
+.term h2 { margin: 10px 0 0; font-size: 18px; }
+footer { max-width: 920px; margin: 0 auto; padding: 18px 16px 40px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--glass-border); }
+@media (max-width: 480px) { .top nav { gap: 10px; font-size: 13px; } .brand { font-size: 15px; } }

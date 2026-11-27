@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import time
 
+import content
 import seo
 
 # 模組 import：from './x.js' → from './x.js?v=版本'
@@ -60,12 +61,22 @@ def main():
         with open(os.path.join(d, "index.html"), "w", encoding="utf-8") as f:
             f.write(seo.render(tpl, site, code, stocks))
 
+    # 長青內容頁：經典名場面、主題、產業、小教室
+    extras = content.extra_pages(tpl, site, stocks)
+    for path, page in extras.items():
+        d = os.path.join(out, path)
+        os.makedirs(d, exist_ok=True)
+        with open(os.path.join(d, "index.html"), "w", encoding="utf-8") as f:
+            f.write(page.replace('href="../page.css"', f'href="../page.css?v={ver}"').replace('href="../../page.css"', f'href="../../page.css?v={ver}"'))
+    with open(os.path.join(out, "rides.json"), "w", encoding="utf-8") as f:
+        f.write(content.rides_json())
+
     # 前端用：代號 → 名稱（自動完成、顯示名稱）
     with open(os.path.join(out, "stocks.json"), "w", encoding="utf-8") as f:
         json.dump({c: v["name"] for c, v in stocks.items()}, f, ensure_ascii=False, separators=(",", ":"))
 
     today = datetime.date.today().isoformat()
-    urls = [(site, "1.0")] + [(f"{site}{c}/", "0.9" if c in seo.POPULAR else "0.6") for c in stocks]
+    urls = [(site, "1.0")] + [(site + p, "0.8" if p.count("/") == 1 or p.startswith(("ride/", "theme/")) else "0.5") for p in extras] + [(f"{site}{c}/", "0.9" if c in seo.POPULAR else "0.6") for c in stocks]
     with open(os.path.join(out, "sitemap.xml"), "w", encoding="utf-8") as f:
         f.write('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n')
         for u, p in urls:
@@ -83,7 +94,7 @@ location.replace(m ? m[1] + '?code=' + m[2].toUpperCase() + location.search.repl
 </script>""" % site)
     with open(os.path.join(out, ".nojekyll"), "w") as f:
         f.write("")
-    print(f"built {len(stocks) + 1} pages → {out}")
+    print(f"built {len(stocks) + 1 + len(extras)} pages → {out}")
 
 
 if __name__ == "__main__":

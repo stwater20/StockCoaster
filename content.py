@@ -253,7 +253,8 @@ def nav_html(prefix):
     return (f'<h3>經典名場面：一鍵重溫</h3><ul class="stock-links">{rides}</ul>'
             f'<h3>主題路線</h3><ul class="stock-links">{themes}</ul>'
             f'<p><a href="{prefix}industry/">📂 依產業找股票</a>・<a href="{prefix}learn/">📖 股市名詞小教室</a>・'
-            f'<a href="{prefix}ride/">🎢 所有經典名場面</a></p>')
+            f'<a href="{prefix}ride/">🎢 所有經典名場面</a></p>'
+            f'<p class="legal"><a href="{prefix}about/">關於本站</a>・<a href="{prefix}disclaimer/">免責聲明</a>・<a href="{prefix}privacy/">隱私權說明</a></p>')
 
 
 PAGE = """<!doctype html>
@@ -276,7 +277,7 @@ PAGE = """<!doctype html>
 </head>
 <body>
   <header class="top"><a class="brand" href="{p}"><img src="{p}favicon.svg" alt="" width="28" height="28"> 股市雲霄飛車</a>
-    <nav><a href="{p}ride/">名場面</a><a href="{p}theme/">主題</a><a href="{p}learn/">小教室</a></nav></header>
+    <nav><a href="{p}ride/">名場面</a><a href="{p}theme/">主題</a><a href="{p}learn/">小教室</a><a href="{p}about/">關於</a></nav></header>
   <main>
     <nav class="crumbs">{crumbs}</nav>
     <h1>{h1}</h1>
@@ -285,6 +286,7 @@ PAGE = """<!doctype html>
   </main>
   <footer>
     <p>股價資料來自 Yahoo Finance 與 FinMind 公開資料，AI 走勢推演為統計推估，純屬娛樂，不構成投資建議。</p>
+    <p><a href="{p}about/">關於本站</a>・<a href="{p}disclaimer/">免責聲明</a>・<a href="{p}privacy/">隱私權說明</a></p>
     <p><a href="{sectools}" target="_blank" rel="noopener">🧰 SecTools.tw</a>：火車駕駛、飛行模擬、資安扭蛋機……更多免費小遊戲，免註冊隨點即玩</p>
   </footer>
 </body>
@@ -426,6 +428,101 @@ def render_learn(site, stocks):
                  body, [("股市雲霄飛車", ""), ("股市名詞小教室", "learn/")], ld)
 
 
+# ---------- 關於、免責聲明、隱私權 ----------
+def _sec(title, paras):
+    return f"<h2>{_e(title)}</h2>" + "".join(p if p.startswith("<") else f"<p>{_e(p)}</p>" for p in paras)
+
+
+def render_about(site, stocks):
+    p = "../"
+    body = (
+        _sec("這是什麼？", [
+            "股市雲霄飛車（StockCoaster）把台股的歷史股價直接鋪成一條像素風雲霄飛車軌道。上漲是喀喀喀慢慢爬坡，下跌是整車一起尖叫俯衝；"
+            "成交量變成軌道底下的台灣街景，量越大樓蓋得越高，爆量那天還會出現一棟台北 101。",
+            "我們想做的事很簡單：讓看盤不再只是一堆數字和 K 線，而是一趟坐過就記得的旅程。漲跌幅、最大回檔、創新高這些概念，坐一次比讀十篇文章還有感。"])
+        + _sec("怎麼玩？", [
+            "<ol><li>選一檔股票或 ETF：熱門路線、自己輸入代號，或從<a href=\"" + p + "ride/\">經典名場面</a>挑一段歷史。</li>"
+            "<li>選期間：近 3 個月到 10 年，或自訂起訖日期。</li>"
+            "<li>按「發車！」。預設是自動觀賞，放著看就好；想挑戰可以切到遊戲模式，點畫面跳躍、撿金幣紅包、閃利空炸彈。</li>"
+            "<li>坐車時點下方小地圖，可以跳到任一天。</li>"
+            "<li>到終點後選擇「一飛衝天」或「直接掉下去」，然後看結算：期間報酬、最大回檔、創新高次數、尖叫次數。</li></ol>"])
+        + _sec("畫面上的東西代表什麼", [
+            "<ul><li><b>紅色軌道</b>：上漲；<b>綠色軌道</b>：下跌（台股習慣紅漲綠跌）。</li>"
+            "<li><b>紫色軌道</b>：駛過「今天」之後的 AI 走勢推演，是模擬出來的可能走勢，不是真實股價。</li>"
+            "<li><b>軌道下的大樓</b>：當天成交量，期間內最大量那天會蓋出台北 101。</li>"
+            "<li><b>旗子</b>：創新高；<b>車廂變多</b>：有人追高上車；<b>車廂掉下去</b>：大跌時有人停損下車。</li>"
+            "<li><b>除權息缺口</b>：單日變動超過漲跌幅限制，多半是除權息或減資，會特別標示，不算跌停。</li></ul>"])
+        + _sec("資料從哪裡來", [
+            "股價來自 FinMind 與 Yahoo Finance 的公開台股資料，上市櫃股票清單來自 FinMind。資料在每個交易日收盤後更新，可能有延遲或錯誤。",
+            "股票分割（例如 0050 在 2025 年的分割）會自動還原，避免軌道出現假的斷崖。期間超過三年時改用週資料，軌道比較平順。"])
+        + _sec("AI 走勢推演怎麼算", [
+            "用近期報酬估計波動度（EWMA），跑 600 條蒙地卡羅模擬，取未來 30 個交易日的中位數與 80% 區間，"
+            "再參考均線、RSI 與近月動能給出「偏多／偏空／中性」的描述。",
+            "它是統計推估，本質上是把過去的波動延伸出去，無法預知新聞、財報或任何突發事件，純屬娛樂。"])
+        + _sec("誰做的", [
+            f'股市雲霄飛車是 <a href="{SECTOOLS}" target="_blank" rel="noopener">SecTools.tw</a> 的作品之一。'
+            "SecTools 做各種免費、免安裝、免註冊的小工具和小遊戲，例如火車駕駛模擬、飛行模擬、資安扭蛋機。有任何建議或發現資料錯誤，歡迎透過 SecTools.tw 回報。"])
+        + f'<p>相關說明：<a href="{p}disclaimer/">免責聲明</a>・<a href="{p}privacy/">隱私權說明</a></p>' + _more(p))
+    ld = [{"@context": "https://schema.org", "@type": "AboutPage", "name": "關於股市雲霄飛車", "url": f"{site}about/", "inLanguage": "zh-TW",
+           "publisher": {"@type": "Organization", "name": "SecTools.tw", "url": "https://sectools.tw/"}}]
+    return _page(site, "about/", p, "關於股市雲霄飛車：把台股走勢變成像素雲霄飛車 – 股市雲霄飛車",
+                 "股市雲霄飛車是什麼、怎麼玩、畫面代表什麼、股價資料來源與 AI 走勢推演的計算方式。由 SecTools.tw 製作，免費免註冊。",
+                 "股市雲霄飛車,StockCoaster,關於,使用說明,台股走勢,SecTools",
+                 "關於股市雲霄飛車", "把台股走勢變成一趟坐過就記得的雲霄飛車。這頁說明它怎麼玩、資料從哪來、AI 怎麼算。",
+                 body, [("股市雲霄飛車", ""), ("關於", "about/")], ld)
+
+
+def render_disclaimer(site, stocks):
+    p = "../"
+    body = (
+        _sec("不是投資建議", [
+            "股市雲霄飛車是一個娛樂與學習用途的視覺化小遊戲。網站上所有內容，包括股價走勢、統計數字、AI 走勢推演、評語、主題清單、個股簡介與經典名場面的文字，"
+            "都只是資訊整理與娛樂，不構成任何投資建議、推薦或買賣邀約。",
+            "本網站不是證券投資顧問，也沒有提供個人化的理財建議。任何投資決定請自行判斷，必要時請諮詢合格的專業人士，並自行承擔風險。"])
+        + _sec("AI 走勢推演只是模擬", [
+            "駛過「今天」之後的紫色軌道，是用歷史波動做的統計模擬，不是預測，更不是保證。實際股價可能和推演結果完全不同。",
+            "終點的「一飛衝天／直接掉下去」只是好玩的動畫，跟股價未來會漲會跌沒有任何關係。"])
+        + _sec("資料可能有誤差", [
+            "股價資料來自 FinMind 與 Yahoo Finance 等第三方公開來源，可能有延遲、缺漏或錯誤；股票分割、除權息等調整也可能不完全準確。"
+            "交易前請以證交所、櫃買中心或你的券商提供的資料為準。",
+            "主題清單與個股簡介是人工整理，產業分類來自公開資料，可能與公司最新狀況不同。"])
+        + _sec("過去績效不代表未來", [
+            "經典名場面與歷史走勢只是回顧，任何股票或 ETF 過去的漲跌都不代表未來會重演。投資有賺有賠，請量力而為。"])
+        + _sec("其他", [
+            "網站中出現的公司名稱、股票代號與商標屬於各自的權利人，僅用於識別，不代表與本網站有任何合作或背書關係。",
+            "畫面中的 SecTools 招牌、彩蛋連結會連到 SecTools.tw 旗下的其他免費小遊戲，屬於站內推廣。",
+            "使用本網站即表示你了解並同意以上說明。本聲明可能隨網站更新而調整。"])
+        + f'<p>相關說明：<a href="{p}about/">關於本站</a>・<a href="{p}privacy/">隱私權說明</a></p>' + _more(p))
+    return _page(site, "disclaimer/", p, "免責聲明：純屬娛樂，不構成投資建議 – 股市雲霄飛車",
+                 "股市雲霄飛車的內容與 AI 走勢推演僅供娛樂與學習，不構成投資建議；股價資料來自第三方公開來源，可能有延遲或錯誤，投資請自行判斷。",
+                 "免責聲明,不構成投資建議,股市雲霄飛車,投資風險",
+                 "免責聲明", "先說清楚：這是一個好玩的視覺化小遊戲，不是投資建議。",
+                 body, [("股市雲霄飛車", ""), ("免責聲明", "disclaimer/")], [])
+
+
+def render_privacy(site, stocks):
+    p = "../"
+    body = (
+        _sec("不用註冊，不收個資", [
+            "股市雲霄飛車不需要註冊或登入，不會要求你提供姓名、Email、電話等個人資料，也沒有放廣告追蹤或第三方分析程式。"])
+        + _sec("存在你瀏覽器裡的東西", [
+            "<p>為了記住你的進度，網站會用瀏覽器的 localStorage 存以下資料，<b>只存在你自己的裝置上</b>，不會上傳：</p>"
+            "<ul><li>解鎖的成就、坐過的次數、猜對的次數、坐過哪些股票</li><li>遊戲模式的最高分</li><li>日間／夜間主題設定</li></ul>"
+            "<p>想清除的話，清除瀏覽器的網站資料即可；用無痕模式時這些資料不會被保留。</p>"])
+        + _sec("會連到哪些外部服務", [
+            "<ul><li><b>FinMind</b>：瀏覽器會直接向 FinMind 的公開 API 查詢股價，查詢內容只有股票代號和日期區間。</li>"
+            "<li><b>GitHub Pages 與 Cloudflare</b>：網站由它們代管與加速，它們可能依自己的政策記錄一般連線資訊（例如 IP 位址）以維持服務運作。</li>"
+            "<li><b>SecTools.tw 連結</b>：點畫面中的彩蛋或推廣連結會開啟 SecTools.tw 旗下網站，網址帶有 utm 參數，用來知道是從股市雲霄飛車點過去的。</li></ul>"])
+        + _sec("分享功能", [
+            "按「分享這趟」時，會用你裝置內建的分享功能或複製到剪貼簿，內容是這趟的網址與成績，由你自己決定要不要傳出去。"])
+        + f'<p>相關說明：<a href="{p}about/">關於本站</a>・<a href="{p}disclaimer/">免責聲明</a></p>' + _more(p))
+    return _page(site, "privacy/", p, "隱私權說明：免註冊、不收個資 – 股市雲霄飛車",
+                 "股市雲霄飛車免註冊、不收集個人資料，成就與最高分只存在你的瀏覽器 localStorage。說明網站會連到哪些外部服務。",
+                 "隱私權,隱私權政策,股市雲霄飛車,localStorage",
+                 "隱私權說明", "免註冊、不收個資。你的成就和最高分只存在你自己的瀏覽器裡。",
+                 body, [("股市雲霄飛車", ""), ("隱私權說明", "privacy/")], [])
+
+
 def _more(p):
     return (f'<h2>繼續逛</h2><ul class="links">'
             f'<li><a href="{p}">🎢 首頁：自己選一檔發車</a></li><li><a href="{p}ride/">🎬 經典名場面</a></li>'
@@ -435,7 +532,8 @@ def _more(p):
 
 def extra_pages(template, site, stocks):
     """回傳 {路徑: HTML}，路徑不含開頭斜線、以 / 結尾。"""
-    out = {"ride/": render_ride_index(site, stocks), "theme/": render_theme_index(site, stocks),
+    out = {"about/": render_about(site, stocks), "disclaimer/": render_disclaimer(site, stocks), "privacy/": render_privacy(site, stocks),
+           "ride/": render_ride_index(site, stocks), "theme/": render_theme_index(site, stocks),
            "industry/": render_industry_index(site, stocks), "learn/": render_learn(site, stocks)}
     for r in RIDES:
         out[f'ride/{r["slug"]}/'] = render_ride(template, site, r["slug"], stocks)

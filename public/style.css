@@ -361,3 +361,7 @@ body.summary-open #hud .controls, body.summary-open .minimap, body.summary-open 
 .ec-hint { margin-top: 10px; font-size: 13px; color: var(--muted); min-height: 1em; }
 @keyframes ecIn { from { opacity: 0; transform: translate(-50%, -40%) scale(.9); } }
 body.summary-open .endchoice { display: none; }
+
+.legal { margin-top: 8px; font-size: 12px; color: var(--muted); text-align: center; }
+.legal a, .disclaimer a { color: var(--muted); text-decoration: underline; }
+.disclaimer a { margin-left: 4px; }

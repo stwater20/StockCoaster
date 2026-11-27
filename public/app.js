@@ -1161,7 +1161,7 @@ function showSummary({ gameOver, ret, bonus, best, isBest }) {
     ${ride.newAch.length ? `<div class="muted" style="margin-top:10px">這趟解鎖的成就</div><div class="newach">${ride.newAch.map((a) => `<div><span class="gicon sm">${a.ico}</span>${a.name}</div>`).join('')}</div>` : ''}
     <div class="btnrow"><button class="primary" id="againBtn">再坐一次</button><button id="shareBtn"><svg><use href="#i-share"/></svg> 分享這趟</button><button id="otherBtn">換一檔</button></div>
     <a class="promo" href="https://sectools.tw/?utm_source=stockcoaster&amp;utm_medium=referral&amp;utm_campaign=summary" target="_blank" rel="noopener"><span class="gicon sm">🧰</span><span>還沒玩夠？<b>SecTools.tw</b> 有火車駕駛、飛行模擬、資安扭蛋機，免費隨點即玩</span><svg><use href="#i-arrow"/></svg></a>
-    <div class="disclaimer">股價資料來源 Yahoo Finance／FinMind（可能有延遲，已自動還原分割）。AI 預測是統計玩具，純屬娛樂，不構成任何投資建議。</div>`;
+    <div class="disclaimer">股價資料來源 Yahoo Finance／FinMind（可能有延遲，已自動還原分割）。AI 預測是統計玩具，純屬娛樂，不構成任何投資建議。<a href="${new URL('disclaimer/', APP_ROOT).href}">免責聲明</a>・<a href="${new URL('about/', APP_ROOT).href}">關於本站</a></div>`;
   setTimeout(() => { $('summary').classList.remove('hidden'); document.body.classList.add('summary-open'); $('oracleMini').classList.add('collapsed'); }, 1000);
   $('againBtn').onclick = () => { $('summary').classList.add('hidden'); document.body.classList.remove('summary-open'); beginRide(); };
   $('otherBtn').onclick = goHome;

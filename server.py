@@ -131,7 +131,7 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.send_json(502, {"error": "抓不到 " + code + "：" + str(e)})
         # SEO 頁：首頁與 /2330/ 這類個股頁，用同一份範本即時產生
         m = re.fullmatch(r"/([0-9A-Za-z]{4,6})/?", u.path)
-        if m and m.group(1).lower() in ("ride", "theme", "learn"):
+        if m and m.group(1).lower() in ("ride", "theme", "learn", "about", "privacy"):
             m = None
         if u.path in ("/", "/index.html") or m:  # noqa: SIM102
             if m and not u.path.endswith("/"):
@@ -148,7 +148,7 @@ class Handler(SimpleHTTPRequestHandler):
             return self.wfile.write(body)
         # 長青內容頁：/ride/、/theme/、/industry/、/learn/
         rel = urllib.parse.unquote(u.path).lstrip("/")
-        if re.match(r"(ride|theme|industry|learn)(/|$)", rel):
+        if re.match(r"(ride|theme|industry|learn|about|disclaimer|privacy)(/|$)", rel):
             if not rel.endswith("/"):
                 self.send_response(301)
                 self.send_header("Location", u.path + "/")
